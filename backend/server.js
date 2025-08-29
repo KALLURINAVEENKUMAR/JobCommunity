@@ -43,7 +43,8 @@ app.use(cors({
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI, {
+const mongoUri = process.env.MONGODB_URI || process.env.DATABASE_URL || 'mongodb://localhost:27017/jobcommunity';
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
@@ -253,7 +254,8 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Socket.IO server is ready`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
