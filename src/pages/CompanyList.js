@@ -12,7 +12,7 @@ const CompanyList = () => {
   const { user, isAuthenticated } = useSelector(state => state.user);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isDarkMode } = useTheme();
+  // const { isDarkMode } = useTheme();
   
   const [showAddCompany, setShowAddCompany] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');

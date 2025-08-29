@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { setMessages, addMessage, editMessage, deleteMessage, clearMessages } from '../features/chat/chatSlice';
@@ -14,7 +14,7 @@ const ChatRoom = () => {
   const { user, isAuthenticated } = useSelector(state => state.user);
   const { messages } = useSelector(state => state.chat);
   const { companies } = useSelector(state => state.company);
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   
   const [newMessage, setNewMessage] = useState('');
   const [isConnected, setIsConnected] = useState(false);
@@ -23,7 +23,7 @@ const ChatRoom = () => {
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingText, setEditingText] = useState('');
   const [showUserProfile, setShowUserProfile] = useState(false);
-  const [showClearTooltip, setShowClearTooltip] = useState(false);
+  // const [showClearTooltip, setShowClearTooltip] = useState(false);
   const [showClearPopup, setShowClearPopup] = useState(false);
   const [showNotificationPopup, setShowNotificationPopup] = useState(false);
   const [showOtherUserProfile, setShowOtherUserProfile] = useState(false);
@@ -85,7 +85,7 @@ const ChatRoom = () => {
         socketRef.current.disconnect();
       }
     };
-  }, [isAuthenticated, navigate, companyId]); // Removed companies.length to avoid infinite loops
+  }, [isAuthenticated, navigate, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     scrollToBottom();
@@ -101,7 +101,7 @@ const ChatRoom = () => {
     if (messages.length > 0) {
       saveMessagesToLocalStorage(messages);
     }
-  }, [messages, companyId]);
+  }, [messages, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeSocket = () => {
     // Disconnect any existing socket first
@@ -513,22 +513,22 @@ const ChatRoom = () => {
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const getRoleColor = (role) => {
-    switch (role) {
-      case 'professional': return 'text-blue-600';
-      case 'student': return 'text-green-600';
-      case 'system': return 'text-gray-500';
-      default: return 'text-gray-800';
-    }
-  };
+  // const getRoleColor = (role) => {
+  //   switch (role) {
+  //     case 'professional': return 'text-blue-600';
+  //     case 'student': return 'text-green-600';
+  //     case 'system': return 'text-gray-500';
+  //     default: return 'text-gray-800';
+  //   }
+  // };
 
-  const getRoleBadge = (role) => {
-    switch (role) {
-      case 'professional': return 'bg-blue-100 text-blue-800';
-      case 'student': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  // const getRoleBadge = (role) => {
+  //   switch (role) {
+  //     case 'professional': return 'bg-blue-100 text-blue-800';
+  //     case 'student': return 'bg-green-100 text-green-800';
+  //     default: return 'bg-gray-100 text-gray-800';
+  //   }
+  // };
 
   const getDisplayName = (user) => {
     if (!user) return '';

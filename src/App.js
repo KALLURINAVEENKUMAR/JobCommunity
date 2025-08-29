@@ -11,7 +11,7 @@ import './App.css';
 import './styles/modern-form.css';
 
 function App() {
-  const { isAuthenticated, user } = useSelector(state => state.user);
+  const { isAuthenticated } = useSelector(state => state.user);
   const dispatch = useDispatch();
 
   // Check if the user's session is still valid on app startup and load persistent sessions

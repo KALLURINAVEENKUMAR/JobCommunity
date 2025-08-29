@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { login, loginStart, loginFailure } from '../features/auth/userSlice';
+import { login } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
@@ -8,7 +8,7 @@ import ThemeToggle from '../components/ThemeToggle';
 const Signup = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isDarkMode } = useTheme();
+  // const { isDarkMode } = useTheme();
   
   const [role, setRole] = useState('');
   const [formData, setFormData] = useState({

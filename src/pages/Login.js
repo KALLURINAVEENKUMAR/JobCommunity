@@ -8,8 +8,8 @@ import ThemeToggle from '../components/ThemeToggle';
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error } = useSelector(state => state.user);
-  const { isDarkMode } = useTheme();
+  const { loading } = useSelector(state => state.user);
+  // const { isDarkMode } = useTheme();
   
   const [formData, setFormData] = useState({
     email: '',
