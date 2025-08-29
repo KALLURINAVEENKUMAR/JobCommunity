@@ -2,7 +2,6 @@ import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext';
 
 const UserProfile = ({ isOpen, onClose }) => {
   const { user } = useSelector(state => state.user);

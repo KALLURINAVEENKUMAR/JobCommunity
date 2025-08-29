@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { setMessages, addMessage, editMessage, deleteMessage, clearMessages } from '../features/chat/chatSlice';
 import { setCompanies } from '../features/company/companySlice';
 import { io } from 'socket.io-client';
-import { useTheme } from '../contexts/ThemeContext';
 import UserProfile from '../components/UserProfile';
 
 const ChatRoom = () => {

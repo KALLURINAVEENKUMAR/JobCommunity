@@ -3,7 +3,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { setCompanies } from '../features/company/companySlice';
 import { logout } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 import UserProfile from '../components/UserProfile';
 

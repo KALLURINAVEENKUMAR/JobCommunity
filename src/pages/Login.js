@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { login, loginStart, loginFailure } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
 
 const Login = () => {
