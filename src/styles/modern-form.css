@@ -1,0 +1,354 @@
+/* Modern Form Styles */
+.modern-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 100%;
+  width: 100%;
+  padding: 30px;
+  border-radius: 20px;
+  position: relative;
+  background-color: #1a1a1a;
+  color: #fff;
+  border: 1px solid #333;
+  transition: all 0.3s ease;
+}
+
+/* Light mode styles */
+:root:not(.dark) .modern-form {
+  background-color: #ffffff;
+  color: #333333;
+  border: 1px solid #e5e5e5;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.modern-title {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 30px;
+  color: #00bfff;
+  margin: 0 0 10px 0;
+}
+
+:root:not(.dark) .modern-title {
+  color: #2563eb;
+}
+
+.modern-title::before {
+  width: 18px;
+  height: 18px;
+}
+
+.modern-title::after {
+  width: 18px;
+  height: 18px;
+  animation: pulse 1s linear infinite;
+}
+
+.modern-title::before,
+.modern-title::after {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  left: 0px;
+  background-color: #00bfff;
+}
+
+:root:not(.dark) .modern-title::before,
+:root:not(.dark) .modern-title::after {
+  background-color: #2563eb;
+}
+
+.modern-message, 
+.modern-signin {
+  font-size: 14.5px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 20px 0;
+}
+
+:root:not(.dark) .modern-message,
+:root:not(.dark) .modern-signin {
+  color: rgba(51, 51, 51, 0.7);
+}
+
+.modern-signin {
+  text-align: center;
+  margin-top: 20px;
+  margin-bottom: 0;
+}
+
+.modern-link {
+  color: #00bfff;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  margin-left: 5px;
+  transition: all 0.3s ease;
+}
+
+:root:not(.dark) .modern-link {
+  color: #2563eb;
+}
+
+.modern-link:hover {
+  text-decoration: underline;
+}
+
+.modern-flex {
+  display: flex;
+  width: 100%;
+  gap: 15px;
+}
+
+.modern-label {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-bottom: 15px;
+}
+
+.modern-input {
+  background-color: #333;
+  color: #fff;
+  width: 100%;
+  padding: 20px 10px 5px 10px;
+  outline: 0;
+  border: 1px solid rgba(105, 105, 105, 0.397);
+  border-radius: 10px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+:root:not(.dark) .modern-input {
+  background-color: #f9f9f9;
+  color: #333;
+  border: 1px solid #d1d5db;
+}
+
+.modern-input:focus {
+  border-color: #00bfff;
+  box-shadow: 0 0 0 2px rgba(0, 191, 255, 0.2);
+}
+
+:root:not(.dark) .modern-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.modern-label span {
+  color: rgba(255, 255, 255, 0.5);
+  position: absolute;
+  left: 10px;
+  top: 0px;
+  font-size: 0.9em;
+  cursor: text;
+  transition: 0.3s ease;
+  pointer-events: none;
+}
+
+:root:not(.dark) .modern-label span {
+  color: rgba(51, 51, 51, 0.5);
+}
+
+.modern-input:placeholder-shown + span {
+  top: 12.5px;
+  font-size: 0.9em;
+}
+
+.modern-input:focus + span,
+.modern-input:valid + span {
+  color: #00bfff;
+  top: 0px;
+  font-size: 0.7em;
+  font-weight: 600;
+}
+
+:root:not(.dark) .modern-input:focus + span,
+:root:not(.dark) .modern-input:valid + span {
+  color: #2563eb;
+}
+
+.modern-submit {
+  border: none;
+  outline: none;
+  padding: 15px 20px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  background-color: #00bfff;
+  cursor: pointer;
+  margin-top: 20px;
+}
+
+:root:not(.dark) .modern-submit {
+  background-color: #2563eb;
+}
+
+.modern-submit:hover {
+  background-color: #0099cc;
+  transform: translateY(-1px);
+}
+
+:root:not(.dark) .modern-submit:hover {
+  background-color: #1d4ed8;
+}
+
+.modern-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.modern-error {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+.modern-error-box {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin: 15px 0;
+}
+
+/* Role selection styles */
+.modern-role-section {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: rgba(0, 191, 255, 0.05);
+  border-radius: 10px;
+  border: 1px solid rgba(0, 191, 255, 0.2);
+}
+
+:root:not(.dark) .modern-role-section {
+  background-color: rgba(37, 99, 235, 0.05);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+.modern-role-label {
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+  margin-bottom: 15px;
+}
+
+:root:not(.dark) .modern-role-label {
+  color: #333;
+}
+
+.modern-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.modern-radio {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 12px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.modern-radio:hover {
+  background-color: rgba(0, 191, 255, 0.1);
+}
+
+:root:not(.dark) .modern-radio:hover {
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+.modern-radio input[type="radio"] {
+  margin-right: 10px;
+  accent-color: #00bfff;
+}
+
+:root:not(.dark) .modern-radio input[type="radio"] {
+  accent-color: #2563eb;
+}
+
+.modern-radio span {
+  color: #fff;
+  font-size: 14px;
+}
+
+:root:not(.dark) .modern-radio span {
+  color: #333;
+}
+
+@keyframes pulse {
+  from {
+    transform: scale(0.9);
+    opacity: 1;
+  }
+
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+  .modern-form {
+    padding: 20px;
+    border-radius: 15px;
+  }
+  
+  .modern-title {
+    font-size: 24px;
+  }
+  
+  .modern-flex {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .modern-flex .modern-label {
+    margin-bottom: 15px;
+  }
+  
+  .modern-input {
+    padding: 18px 8px 5px 8px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-form {
+    padding: 15px;
+    margin: 10px;
+    gap: 15px;
+  }
+  
+  .modern-title {
+    font-size: 22px;
+    padding-left: 25px;
+  }
+  
+  .modern-title::before,
+  .modern-title::after {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .modern-role-section {
+    margin: 15px 0;
+    padding: 12px;
+  }
+}
