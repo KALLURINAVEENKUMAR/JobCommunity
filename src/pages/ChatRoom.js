@@ -112,7 +112,8 @@ const ChatRoom = () => {
     console.log('🔌 Initializing new socket connection');
     
     // Connect to backend Socket.IO server
-    socketRef.current = io('http://localhost:5000', {
+    const socketUrl = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+    socketRef.current = io(socketUrl, {
       query: {
         userId: user?.id || user?.email,
         userName: user?.name || user?.email,
