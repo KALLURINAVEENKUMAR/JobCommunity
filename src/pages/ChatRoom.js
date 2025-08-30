@@ -33,12 +33,10 @@ const ChatRoom = () => {
   // User tagging states
   const [showUserSuggestions, setShowUserSuggestions] = useState(false);
   const [userSuggestions, setUserSuggestions] = useState([]);
-  const [mentionQuery, setMentionQuery] = useState('');
   const [allUsers, setAllUsers] = useState([]); // All users in the database
   
   // Reply states
   const [replyingTo, setReplyingTo] = useState(null);
-  const [swipedMessageId, setSwipedMessageId] = useState(null);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   
   const messagesEndRef = useRef(null);
@@ -124,7 +122,6 @@ const ChatRoom = () => {
     
     if (mentionMatch) {
       const query = mentionMatch[1].toLowerCase();
-      setMentionQuery(query);
       
       // Filter users based on query
       const filtered = allUsers.filter(user => 
@@ -137,7 +134,6 @@ const ChatRoom = () => {
     } else {
       setShowUserSuggestions(false);
       setUserSuggestions([]);
-      setMentionQuery('');
       setSelectedSuggestionIndex(0);
     }
   };
@@ -182,7 +178,6 @@ const ChatRoom = () => {
       
       setShowUserSuggestions(false);
       setUserSuggestions([]);
-      setMentionQuery('');
       setSelectedSuggestionIndex(0);
     } else {
       console.log('No mention match found, adding mention at end');
@@ -201,7 +196,6 @@ const ChatRoom = () => {
       
       setShowUserSuggestions(false);
       setUserSuggestions([]);
-      setMentionQuery('');
       setSelectedSuggestionIndex(0);
     }
   };
@@ -1111,7 +1105,6 @@ const ChatRoom = () => {
                           case 'Escape':
                             setShowUserSuggestions(false);
                             setUserSuggestions([]);
-                            setMentionQuery('');
                             setSelectedSuggestionIndex(0);
                             break;
                           default:
