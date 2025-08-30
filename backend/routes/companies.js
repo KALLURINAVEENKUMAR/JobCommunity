@@ -1,12 +1,22 @@
 const express = require('express');
 const Company = require('../models/Company');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
 // Get all companies
 router.get('/', async (req, res) => {
   try {
+    console.log('🔍 Attempting to fetch companies from database...');
+    
+    // Check database connection first
+    if (mongoose.connection.readyState !== 1) {
+      console.log('❌ Database not connected, state:', mongoose.connection.readyState);
+      return res.status(500).json({ message: 'Database not connected' });
+    }
+    
     const companies = await Company.find().sort({ createdAt: -1 });
+    console.log('📊 Found companies:', companies.length);
     
     // Transform to match frontend format
     const formattedCompanies = companies.map(company => ({
@@ -16,10 +26,15 @@ router.get('/', async (req, res) => {
       memberCount: company.memberCount
     }));
 
+    console.log('✅ Returning formatted companies:', formattedCompanies.length);
     res.json(formattedCompanies);
   } catch (error) {
-    console.error('Error fetching companies:', error);
-    res.status(500).json({ message: 'Server error fetching companies' });
+    console.error('❌ Error fetching companies:', error);
+    res.status(500).json({ 
+      message: 'Server error fetching companies',
+      error: error.message,
+      dbState: mongoose.connection.readyState
+    });
   }
 });
 

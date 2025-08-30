@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { login, loginStart, loginFailure } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+import ApiService from '../utils/apiService';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -63,20 +64,12 @@ const Login = () => {
     dispatch(loginStart());
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        }),
+      const data = await ApiService.login({
+        email: formData.email,
+        password: formData.password
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Login successful:', data);
+      
+      console.log('Login successful:', data);
         
         // Ensure the user object has a token
         const userWithToken = {
