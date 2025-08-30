@@ -150,12 +150,23 @@ const CompanyList = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <div 
+      className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-300 relative overflow-hidden"
+      style={{ 
+        overscrollBehavior: 'none',
+        touchAction: 'pan-x pan-y'
+      }}
+    >
+      {/* Enhanced background with animated patterns */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-indigo-500/10 dark:from-blue-400/10 dark:via-purple-400/10 dark:to-indigo-400/15"></div>
+      
       <ThemeToggle />
       
-      {/* Fixed Modern Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700">
-        <div className="w-full px-3 sm:px-6 lg:px-8">
+      {/* Enhanced Fixed Header */}
+      <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-white/95 via-blue-50/90 to-purple-50/95 dark:from-gray-800/95 dark:via-gray-850/90 dark:to-gray-900/95 backdrop-blur-xl shadow-xl border-b border-blue-200/60 dark:border-gray-700/60">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5 dark:from-blue-400/10 dark:via-purple-400/10 dark:to-indigo-400/10"></div>
+        
+        <div className="w-full px-3 sm:px-6 lg:px-8 relative z-10">
           <div className="flex justify-between items-center py-4 sm:py-6">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
               <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">

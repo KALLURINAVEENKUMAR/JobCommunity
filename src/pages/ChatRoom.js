@@ -557,7 +557,7 @@ const ChatRoom = () => {
                           key={index} 
                           className="w-4 h-4 sm:w-6 sm:h-6 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs font-medium text-white"
                         >
-                          {user.name?.charAt(0).toUpperCase() || 'U'}
+                          {(user.firstName || user.name)?.charAt(0).toUpperCase() || 'U'}
                         </div>
                       ))}
                     </div>
@@ -604,7 +604,7 @@ const ChatRoom = () => {
                   title="View Profile"
                 >
                   <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs sm:text-sm flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
-                    {(user?.name || user?.email)?.charAt(0).toUpperCase()}
+                    {(user?.firstName || user?.name || user?.email)?.charAt(0).toUpperCase()}
                   </div>
                   <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 hidden md:inline truncate max-w-32 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {getDisplayName(user)}
@@ -621,7 +621,8 @@ const ChatRoom = () => {
         <div className="h-full w-full px-2 sm:px-4 lg:px-8">
           <div className="h-full flex flex-col">
             {/* Messages List */}
-            <div className="flex-1 overflow-y-auto py-3 sm:py-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+            <div className="flex-1 overflow-y-auto py-3 sm:py-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scroll-smooth"
+                 style={{ maxHeight: 'calc(100vh - 200px)' }}>
               <div className="min-h-full space-y-2 sm:space-y-3">
               {messages.map((message) => {
                 const isInterviewHelp = message.userRole === 'student' && 
@@ -643,7 +644,7 @@ const ChatRoom = () => {
                         ? 'bg-gradient-to-r from-green-500 to-green-600' : 
                         'bg-gradient-to-r from-gray-500 to-gray-600'
                     } ${isOwnMessage ? 'ring-blue-200 dark:ring-blue-800' : ''}`}>
-                      {message.userName.charAt(0).toUpperCase()}
+                      {(message.firstName || message.userName)?.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-1 sm:space-x-3 mb-1 sm:mb-2">
@@ -950,7 +951,7 @@ const ChatRoom = () => {
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-bold text-2xl border-2 border-white/30">
-                      {(selectedUser?.name || selectedUser?.email)?.charAt(0).toUpperCase()}
+                      {(selectedUser?.firstName || selectedUser?.name || selectedUser?.email)?.charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <h3 className="text-xl font-bold text-white">User Profile</h3>

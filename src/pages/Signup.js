@@ -3,6 +3,7 @@ import { useDispatch } from 'react-redux';
 import { login } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+import ApiService from '../utils/apiService';
 
 const Signup = () => {
   const dispatch = useDispatch();
@@ -24,6 +25,8 @@ const Signup = () => {
     skills: ''
   });
   const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -106,6 +109,8 @@ const Signup = () => {
       try {
         // Prepare user data for API
         const userData = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
           email: formData.email,
           password: formData.password,
           confirmPassword: formData.confirmPassword,
@@ -119,63 +124,30 @@ const Signup = () => {
           })
         };
 
-        const response = await fetch('http://localhost:5000/api/auth/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(userData),
-        });
+        const data = await ApiService.register(userData);
 
-        const data = await response.json();
-
-        if (response.ok) {
-          // Registration successful, login user automatically
-          // Generate a token for the user
-          const userWithToken = {
-            ...data.user,
-            token: `demo_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-          };
-          
-          dispatch(login({ user: userWithToken, keepLoggedIn: true }));
-          window.showToast?.('Account created successfully! Welcome! 🎉', 'success');
-          navigate('/companies');
-        } else {
-          setErrors({ general: data.message || 'Registration failed' });
-        }
+        // Registration successful, login user automatically
+        // Generate a token for the user
+        const userWithToken = {
+          ...data.user,
+          token: `demo_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        };
+        
+        dispatch(login({ user: userWithToken, keepLoggedIn: true }));
+        window.showToast?.('Account created successfully! Welcome! 🎉', 'success');
+        navigate('/companies');
       } catch (error) {
         console.error('Registration error:', error);
-        console.log('Backend not available, creating demo account...');
-        
-        // Create a demo user when backend is not available
-        const demoUser = {
-          id: Date.now(),
-          email: formData.email,
-          role: role,
-          token: `demo_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          ...(role === 'professional' ? { 
-            companyName: formData.companyName,
-            name: formData.email.split('@')[0]
-          } : {
-            college: formData.college,
-            cgpa: formData.cgpa,
-            skills: formData.skills.split(',').map(skill => skill.trim()),
-            name: formData.email.split('@')[0]
-          })
-        };
-
-        dispatch(login({ user: demoUser, keepLoggedIn: true }));
-        window.showToast?.('Demo account created! You can explore the app. 🚀', 'success');
-        navigate('/companies');
+        setErrors({ general: error.message || 'Registration failed' });
       }
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+    <div className="auth-container">
       <ThemeToggle />
       
-      <div className="w-full max-w-md">
+      <div className="auth-form-wrapper">
         <div className="modern-form">
           <form onSubmit={handleSubmit}>
             <p className="modern-title">Register</p>
@@ -227,29 +199,61 @@ const Signup = () => {
             </label>
             {errors.email && <p className="modern-error">{errors.email}</p>}
             
-            <label className="modern-label">
+            <label className="modern-label relative">
               <input
                 className="modern-input"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
                 required
               />
               <span>Password</span>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              >
+                {showPassword ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                )}
+              </button>
             </label>
             {errors.password && <p className="modern-error">{errors.password}</p>}
             
-            <label className="modern-label">
+            <label className="modern-label relative">
               <input
                 className="modern-input"
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
                 required
               />
               <span>Confirm password</span>
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              >
+                {showConfirmPassword ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                )}
+              </button>
             </label>
             {errors.confirmPassword && <p className="modern-error">{errors.confirmPassword}</p>}
 
