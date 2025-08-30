@@ -16,16 +16,47 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
+/* Mobile responsive form */
+@media (max-width: 768px) {
+  .modern-form {
+    padding: 20px;
+    border-radius: 16px;
+    margin: 10px auto;
+    gap: 16px;
+    min-height: auto;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+  }
+}
+
 /* Perfect centering container */
 .auth-container {
   min-height: 100vh;
+  min-height: 100dvh; /* Better mobile viewport support */
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 16px;
   background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
   position: relative;
   overflow: hidden;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  .auth-container {
+    padding: 12px;
+    align-items: flex-start;
+    padding-top: max(env(safe-area-inset-top), 20px);
+    padding-bottom: max(env(safe-area-inset-bottom), 20px);
+  }
+  
+  .auth-container > * {
+    width: 100%;
+    max-width: 400px;
+    margin-top: auto;
+    margin-bottom: auto;
+  }
 }
 
 .auth-container::before {

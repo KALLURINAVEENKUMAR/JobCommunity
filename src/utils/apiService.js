@@ -38,6 +38,24 @@ class ApiService {
     return data;
   }
 
+  // Get all users for mentions
+  static async getAllUsers(token) {
+    const response = await fetch(`${API_BASE_URL}/auth/users`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch users');
+    }
+    
+    return data;
+  }
+
   // Company endpoints
   static async getCompanies() {
     const response = await fetch(`${API_BASE_URL}/companies`);

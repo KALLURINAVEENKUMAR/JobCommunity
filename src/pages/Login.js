@@ -85,7 +85,21 @@ const Login = () => {
     } catch (error) {
       console.error('Login error:', error);
       dispatch(loginFailure(error.message || 'Login failed'));
-      setValidationErrors({ general: error.message || 'Login failed' });
+      
+      // Specific error messages for different scenarios
+      let errorMessage = 'Login failed';
+      if (error.message.toLowerCase().includes('password')) {
+        errorMessage = 'Password is incorrect. Please try again.';
+      } else if (error.message.toLowerCase().includes('email') || error.message.toLowerCase().includes('user')) {
+        errorMessage = 'No account found with this email address.';
+      } else if (error.message.toLowerCase().includes('invalid')) {
+        errorMessage = 'Invalid email or password. Please check your credentials.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setValidationErrors({ general: errorMessage });
+      window.showToast?.(errorMessage, 'error');
     }
   };
 

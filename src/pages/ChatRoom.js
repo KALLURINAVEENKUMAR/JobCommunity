@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { setMessages, addMessage, editMessage, deleteMessage, clearMessages } from '../features/chat/chatSlice';
 import { setCompanies } from '../features/company/companySlice';
 import { io } from 'socket.io-client';
+import { toast } from 'react-toastify';
 import UserProfile from '../components/UserProfile';
 import ApiService from '../utils/apiService';
 
@@ -28,8 +29,21 @@ const ChatRoom = () => {
   const [showNotificationPopup, setShowNotificationPopup] = useState(false);
   const [showOtherUserProfile, setShowOtherUserProfile] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  
+  // User tagging states
+  const [showUserSuggestions, setShowUserSuggestions] = useState(false);
+  const [userSuggestions, setUserSuggestions] = useState([]);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [allUsers, setAllUsers] = useState([]); // All users in the database
+  
+  // Reply states
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [swipedMessageId, setSwipedMessageId] = useState(null);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
+  const messageInputRef = useRef(null);
   const localMessageIds = useRef(new Set()); // Track locally sent messages to prevent duplicates
 
   const currentCompany = companies.find(c => 
@@ -103,6 +117,163 @@ const ChatRoom = () => {
     }
   }, [messages, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Handle mention detection
+  const handleMentionDetection = (inputValue, cursorPosition) => {
+    const textBeforeCursor = inputValue.substring(0, cursorPosition);
+    const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    
+    if (mentionMatch) {
+      const query = mentionMatch[1].toLowerCase();
+      setMentionQuery(query);
+      
+      // Filter users based on query
+      const filtered = allUsers.filter(user => 
+        user.name.toLowerCase().includes(query) || 
+        user.email.toLowerCase().includes(query)
+      );
+      setUserSuggestions(filtered.slice(0, 10)); // Limit to 10 suggestions
+      setShowUserSuggestions(true);
+      setSelectedSuggestionIndex(0); // Reset selection to first item
+    } else {
+      setShowUserSuggestions(false);
+      setUserSuggestions([]);
+      setMentionQuery('');
+      setSelectedSuggestionIndex(0);
+    }
+  };
+
+  // Handle user selection from mention suggestions
+  const handleUserMention = (selectedUser) => {
+    console.log('handleUserMention called with:', selectedUser);
+    
+    const messageInput = messageInputRef.current;
+    const currentValue = newMessage; // Use state value instead of input value
+    const cursorPosition = messageInput.selectionStart;
+    
+    console.log('Current message value:', currentValue);
+    console.log('Cursor position:', cursorPosition);
+    
+    // Find the @ position
+    const textBeforeCursor = currentValue.substring(0, cursorPosition);
+    const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    
+    console.log('Text before cursor:', textBeforeCursor);
+    console.log('Mention match:', mentionMatch);
+    
+    if (mentionMatch) {
+      const mentionStart = cursorPosition - mentionMatch[0].length;
+      const beforeMention = currentValue.substring(0, mentionStart);
+      const afterCursor = currentValue.substring(cursorPosition);
+      
+      const mentionText = `@${selectedUser.name} `;
+      const newValue = beforeMention + mentionText + afterCursor;
+      const newCursorPos = mentionStart + mentionText.length;
+      
+      console.log('New message value:', newValue);
+      
+      // Update the state instead of directly changing input value
+      setNewMessage(newValue);
+      
+      // Set cursor position after state update
+      setTimeout(() => {
+        messageInput.focus();
+        messageInput.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+      
+      setShowUserSuggestions(false);
+      setUserSuggestions([]);
+      setMentionQuery('');
+      setSelectedSuggestionIndex(0);
+    } else {
+      console.log('No mention match found, adding mention at end');
+      // If no @ found, just add the mention at the current position
+      const mentionText = `@${selectedUser.name} `;
+      const beforeCursor = currentValue.substring(0, cursorPosition);
+      const afterCursor = currentValue.substring(cursorPosition);
+      const newValue = beforeCursor + mentionText + afterCursor;
+      
+      setNewMessage(newValue);
+      
+      setTimeout(() => {
+        messageInput.focus();
+        messageInput.setSelectionRange(cursorPosition + mentionText.length, cursorPosition + mentionText.length);
+      }, 0);
+      
+      setShowUserSuggestions(false);
+      setUserSuggestions([]);
+      setMentionQuery('');
+      setSelectedSuggestionIndex(0);
+    }
+  };
+
+  // Load all users for mentions from database
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        if (user && user.token) {
+          const users = await ApiService.getAllUsers(user.token);
+          setAllUsers(users);
+          console.log(`✅ Loaded ${users.length} users for mentions`);
+        }
+      } catch (error) {
+        console.error('Failed to fetch users for mentions:', error);
+        // Fallback to empty array if API fails
+        setAllUsers([]);
+        toast.error('Failed to load users for mentions');
+      }
+    };
+
+    fetchUsers();
+  }, [user]);
+
+  // Render message text with highlighted mentions
+  const renderMessageWithMentions = (text) => {
+    const mentionRegex = /@(\w+(?:\s+\w+)*)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = mentionRegex.exec(text)) !== null) {
+      // Add text before mention
+      if (match.index > lastIndex) {
+        parts.push(text.slice(lastIndex, match.index));
+      }
+      
+      // Add mention with highlighting
+      const mentionedName = match[1];
+      const isCurrentUser = user?.name && user.name.toLowerCase() === mentionedName.toLowerCase();
+      
+      parts.push(
+        <span 
+          key={match.index}
+          className={`inline-block px-2 py-1 mx-0.5 rounded-md text-sm font-medium cursor-pointer transition-all duration-200 hover:scale-105 shadow-sm ${
+            isCurrentUser 
+              ? 'bg-blue-600 text-white shadow-md ring-1 ring-blue-500' 
+              : 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 ring-1 ring-blue-300 dark:ring-blue-700'
+          }`}
+          title={isCurrentUser ? "That's you!" : `Mentioned: ${mentionedName}`}
+          onClick={() => {
+            if (!isCurrentUser) {
+              // Could add profile viewing functionality here
+              console.log(`Clicked on mention: ${mentionedName}`);
+            }
+          }}
+        >
+          @{mentionedName}
+        </span>
+      );
+      
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+    
+    return parts.length > 1 ? parts : text;
+  };
+
   const initializeSocket = () => {
     // Disconnect any existing socket first
     if (socketRef.current) {
@@ -152,7 +323,18 @@ const ChatRoom = () => {
       
       // Show notification if message is from another user
       if (message.userId !== (user?.id || user?.email)) {
-        if (message.isInterviewHelp && user?.role === 'professional') {
+        // Check if current user is mentioned
+        const isUserMentioned = message.mentions && message.mentions.some(mention => 
+          mention.userEmail === user?.email || mention.userName.toLowerCase() === user?.name?.toLowerCase()
+        );
+        
+        if (isUserMentioned) {
+          // Special notification for mentions
+          toast.success(`🏷️ ${message.userName} mentioned you in ${message.companyName || 'chat'}!`, {
+            duration: 6000,
+            position: 'top-right'
+          });
+        } else if (message.isInterviewHelp && user?.role === 'professional') {
           // Special notification for interview help
           showInterviewHelpNotification(message);
         } else {
@@ -268,6 +450,25 @@ const ChatRoom = () => {
     
     if (!newMessage.trim()) return;
 
+    // Parse mentions from the message
+    const mentionRegex = /@(\w+(?:\s+\w+)*)/g;
+    const mentions = [];
+    let match;
+    
+    while ((match = mentionRegex.exec(newMessage)) !== null) {
+      const mentionedName = match[1];
+      const mentionedUser = allUsers.find(user => 
+        user.name.toLowerCase() === mentionedName.toLowerCase()
+      );
+      if (mentionedUser) {
+        mentions.push({
+          userId: mentionedUser.id,
+          userName: mentionedUser.name,
+          userEmail: mentionedUser.email
+        });
+      }
+    }
+
     const messageData = {
       id: Date.now(),
       text: newMessage.trim(),
@@ -278,7 +479,14 @@ const ChatRoom = () => {
       companyName: user?.companyName,
       college: user?.college,
       timestamp: Date.now(),
-      companyId: companyId // Keep as original format from URL
+      companyId: companyId, // Keep as original format from URL
+      mentions: mentions, // Add mentions to message data
+      replyTo: replyingTo ? {
+        messageId: replyingTo.id,
+        text: replyingTo.text,
+        userName: replyingTo.userName,
+        userId: replyingTo.userId
+      } : null
     };
 
     try {
@@ -286,6 +494,9 @@ const ChatRoom = () => {
       await ApiService.sendMessage(messageData);
 
       console.log('📤 Sending message via API:', messageData);
+      if (mentions.length > 0) {
+        console.log('👥 Message contains mentions:', mentions);
+      }
       console.log('✅ API success, emitting via socket');
       // Only emit via socket - don't add to local state
       // Socket.IO will broadcast the message back to all clients including sender
@@ -305,6 +516,9 @@ const ChatRoom = () => {
     }
     
     setNewMessage('');
+    setShowUserSuggestions(false);
+    setReplyingTo(null); // Clear reply after sending
+    setSelectedSuggestionIndex(0);
   };
 
   const startEditMessage = (messageId, currentText) => {
@@ -524,6 +738,59 @@ const ChatRoom = () => {
     );
   }
 
+  // Swipe and Reply Functions
+  const handleSwipeStart = (messageId, e) => {
+    const touch = e.touches[0];
+    const message = e.currentTarget;
+    message.startX = touch.clientX;
+    message.startTime = Date.now();
+  };
+
+  const handleSwipeMove = (messageId, e) => {
+    const touch = e.touches[0];
+    const message = e.currentTarget;
+    if (!message.startX) return;
+
+    const diffX = touch.clientX - message.startX;
+    const maxSwipe = 80;
+    
+    if (diffX > 0 && diffX <= maxSwipe) {
+      message.style.transform = `translateX(${diffX}px)`;
+      message.style.backgroundColor = diffX > 40 ? 'rgba(59, 130, 246, 0.1)' : 'transparent';
+    }
+  };
+
+  const handleSwipeEnd = (message, e) => {
+    const touch = e.changedTouches[0];
+    const messageElement = e.currentTarget;
+    if (!messageElement.startX) return;
+
+    const diffX = touch.clientX - messageElement.startX;
+    const timeDiff = Date.now() - messageElement.startTime;
+    
+    // Reset transform
+    messageElement.style.transform = 'translateX(0)';
+    messageElement.style.backgroundColor = 'transparent';
+    
+    // If swiped right more than 60px and quickly (under 300ms)
+    if (diffX > 60 && timeDiff < 300) {
+      setReplyingTo(message);
+      messageInputRef.current?.focus();
+    }
+    
+    // Clean up
+    delete messageElement.startX;
+    delete messageElement.startTime;
+  };
+
+  const cancelReply = () => {
+    setReplyingTo(null);
+  };
+
+  const isOwnMessage = (message) => {
+    return message.userId === user?.id || message.userId === user?.email;
+  };
+
   return (
     <div className="h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col overflow-hidden">
       {/* Header */}
@@ -631,44 +898,48 @@ const ChatRoom = () => {
                    message.text.toLowerCase().includes('tomorrow') ||
                    message.text.toLowerCase().includes('guidance'));
                 
-                const isOwnMessage = message.userId === (user?.id || user?.email);
+                const isOwn = isOwnMessage(message);
                 
                 return (
-                  <div key={message.id} className={`flex items-start space-x-2 sm:space-x-4 animate-fade-in group px-1 sm:px-2 py-1 sm:py-2 ${
-                    isInterviewHelp ? 'bg-gradient-to-r from-amber-50/50 via-yellow-50/50 to-orange-50/50 dark:from-amber-900/10 dark:via-yellow-900/10 dark:to-orange-900/10 border-l-4 border-gradient-to-b from-amber-400 to-orange-500 pl-3 sm:pl-6 rounded-r-xl' : ''
-                  }`}>
-                    <div className={`flex-shrink-0 w-6 h-6 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-bold shadow-lg ring-2 ring-white dark:ring-gray-800 transition-all duration-200 ${
-                      message.userRole === 'professional' 
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
-                      message.userRole === 'student' 
-                        ? 'bg-gradient-to-r from-green-500 to-green-600' : 
-                        'bg-gradient-to-r from-gray-500 to-gray-600'
-                    } ${isOwnMessage ? 'ring-blue-200 dark:ring-blue-800' : ''}`}>
-                      {(message.firstName || message.userName)?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-1 sm:space-x-3 mb-1 sm:mb-2">
+                  <div 
+                    key={message.id} 
+                    className={`flex mb-2 sm:mb-3 px-2 sm:px-4 ${isOwn ? 'justify-end' : 'justify-start'}`}
+                    onTouchStart={(e) => handleSwipeStart(message.id, e)}
+                    onTouchMove={(e) => handleSwipeMove(message.id, e)}
+                    onTouchEnd={(e) => handleSwipeEnd(message, e)}
+                  >
+                    <div className={`max-w-xs sm:max-w-md lg:max-w-lg xl:max-w-xl rounded-2xl px-3 sm:px-4 py-2 sm:py-3 shadow-md transition-all duration-200 transform hover:scale-105 ${
+                      isOwn 
+                        ? 'bg-blue-500 text-white ml-8 sm:ml-16 rounded-br-md' 
+                        : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 mr-8 sm:mr-16 rounded-bl-md border border-gray-200 dark:border-gray-600'
+                    } ${isInterviewHelp && !isOwn ? 'border-l-4 border-amber-400 bg-gradient-to-r from-amber-50/50 to-yellow-50/50 dark:from-amber-900/20 dark:to-yellow-900/20' : ''}`}>
+                    
+                    {/* Reply indicator */}
+                    {message.replyTo && (
+                      <div className={`mb-2 pb-2 border-l-2 pl-3 text-xs opacity-70 ${
+                        isOwn ? 'border-white/50' : 'border-gray-400 dark:border-gray-500'
+                      }`}>
+                        <div className="font-medium">{message.replyTo.userName}</div>
+                        <div className="truncate">{message.replyTo.text}</div>
+                      </div>
+                    )}
+                    
+                    {/* User name for other's messages */}
+                    {!isOwn && (
+                      <div className="flex items-center mb-1">
                         <button
                           onClick={() => handleUserProfileClick(message)}
-                          className={`font-semibold text-xs sm:text-sm truncate transition-colors duration-200 hover:underline ${
-                            message.userRole === 'professional' ? 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300' :
-                            message.userRole === 'student' ? 'text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300' : 
+                          className={`font-semibold text-xs truncate transition-colors duration-200 hover:underline ${
+                            message.userRole === 'professional' ? 'text-blue-600 dark:text-blue-400' :
+                            message.userRole === 'student' ? 'text-green-600 dark:text-green-400' : 
                             'text-gray-500 dark:text-gray-400'
-                          } ${message.userId === user?.id || message.userId === user?.email || message.userRole === 'system' ? 'cursor-default' : 'cursor-pointer hover:scale-105'}`}
-                          disabled={message.userId === user?.id || message.userId === user?.email || message.userRole === 'system'}
-                          title={message.userId === user?.id || message.userId === user?.email || message.userRole === 'system' 
-                            ? "" 
-                            : `Click to view ${message.userName}'s profile`}
+                          } ${message.userRole === 'system' ? 'cursor-default' : 'cursor-pointer'}`}
+                          disabled={message.userRole === 'system'}
                         >
                           {message.userName}
-                          {!(message.userId === user?.id || message.userId === user?.email || message.userRole === 'system') && (
-                            <svg className="inline w-3 h-3 ml-1 opacity-50 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                          )}
                         </button>
                         {message.userRole !== 'system' && (
-                          <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full font-medium transition-all ${
+                          <span className={`ml-2 px-2 py-0.5 text-xs rounded-full font-medium ${
                             message.userRole === 'professional' 
                               ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' 
                               : 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
@@ -677,103 +948,99 @@ const ChatRoom = () => {
                           </span>
                         )}
                         {isInterviewHelp && (
-                          <span className="px-2 sm:px-3 py-0.5 sm:py-1 text-xs rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold animate-pulse shadow-lg">
-                            🚨 Needs Help
+                          <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold">
+                            🚨 Help
                           </span>
-                        )}
-                        {message.isEdited && (
-                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                            ✏️ edited
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {formatTime(message.timestamp)}
-                        </span>
-                        
-                        {/* Edit/Delete buttons for own messages */}
-                        {isOwnMessage && message.userRole !== 'system' && (
-                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <button
-                              onClick={() => startEditMessage(message.id, message.text)}
-                              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-1 sm:p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200"
-                              title="Edit message"
-                            >
-                              <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => deleteMessageHandler(message.id)}
-                              className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-1 sm:p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200"
-                              title="Delete message"
-                            >
-                              <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                              </svg>
-                            </button>
-                          </div>
                         )}
                       </div>
-                      
-                      {/* Message content - editable if editing */}
-                      {editingMessageId === message.id ? (
-                        <div className="mt-3">
-                          <input
-                            type="text"
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && saveEdit(message.id)}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-all duration-200"
-                            autoFocus
-                          />
-                          <div className="flex space-x-3 mt-3">
-                            <button
-                              onClick={() => saveEdit(message.id)}
-                              className="flex items-center space-x-2 text-xs bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                              </svg>
-                              <span>Save</span>
-                            </button>
-                            <button
-                              onClick={cancelEdit}
-                              className="flex items-center space-x-2 text-xs bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                              </svg>
-                              <span>Cancel</span>
-                            </button>
+                    )}
+                    
+                    {/* Message content */}
+                    {editingMessageId === message.id ? (
+                      <div className="w-full">
+                        <input
+                          type="text"
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && saveEdit(message.id)}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                          autoFocus
+                        />
+                        <div className="flex space-x-2 mt-2">
+                          <button
+                            onClick={() => saveEdit(message.id)}
+                            className="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg transition-colors"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="text-xs bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className={`text-sm leading-relaxed ${isOwn ? 'text-white' : ''}`}>
+                          {renderMessageWithMentions(message.text)}
+                        </div>
+                        <div className={`flex items-center justify-between mt-1 text-xs ${
+                          isOwn ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
+                        }`}>
+                          <span>{formatTime(message.timestamp)}</span>
+                          <div className="flex items-center space-x-1">
+                            {message.isEdited && (
+                              <span className={`${isOwn ? 'text-white/70' : 'text-gray-500'}`}>
+                                ✏️ edited
+                              </span>
+                            )}
+                            {/* Edit/Delete buttons for own messages */}
+                            {isOwn && message.userRole !== 'system' && (
+                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                                <button
+                                  onClick={() => startEditMessage(message.id, message.text)}
+                                  className="text-white/70 hover:text-white p-1 rounded transition-colors"
+                                  title="Edit message"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => deleteMessageHandler(message.id)}
+                                  className="text-white/70 hover:text-white p-1 rounded transition-colors"
+                                  title="Delete message"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      ) : (
-                        <div className="mt-2 sm:mt-3">
-                          <p className={`text-sm sm:text-base text-gray-900 dark:text-gray-100 leading-relaxed ${
-                            isInterviewHelp ? 'font-medium' : ''
-                          }`}>
-                            {message.text}
-                          </p>
-                        </div>
-                      )}
-                      
-                      {/* Interview Help Call-to-Action */}
-                      {isInterviewHelp && user?.role === 'professional' && (
-                        <div className="mt-3 sm:mt-4 bg-blue-50/80 dark:bg-blue-900/20 p-3 sm:p-4 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
-                          <div className="flex items-start space-x-3">
-                            <div className="text-lg sm:text-xl">💡</div>
-                            <div>
-                              <p className="text-xs sm:text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-                                <strong>Quick Response Opportunity:</strong>
-                              </p>
-                              <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-200">
-                                Share your {currentCompany?.name} experience or offer personalized interview guidance to help this candidate succeed!
-                              </p>
-                            </div>
+                      </div>
+                    )}
+                    
+                    {/* Interview Help Call-to-Action for professionals */}
+                    {isInterviewHelp && !isOwn && user?.role === 'professional' && (
+                      <div className="mt-3 bg-blue-50/80 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                        <div className="flex items-start space-x-2">
+                          <div className="text-lg">💡</div>
+                          <div>
+                            <p className="text-xs font-medium text-blue-900 dark:text-blue-100 mb-1">
+                              <strong>Quick Response Opportunity:</strong>
+                            </p>
+                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                              Share your {currentCompany?.name} experience or offer guidance!
+                            </p>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
+                  </div>
                   </div>
                 );
               })}
@@ -783,23 +1050,144 @@ const ChatRoom = () => {
 
             {/* Message Input Area */}
             <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-t border-gray-200/50 dark:border-gray-700/50 p-3 sm:p-6 shadow-lg flex-shrink-0">
+              
+              {/* Reply Preview */}
+              {replyingTo && (
+                <div className="mb-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-3 rounded-r-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
+                        Replying to {replyingTo.userName}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                        {replyingTo.text}
+                      </div>
+                    </div>
+                    <button
+                      onClick={cancelReply}
+                      className="ml-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Message Input Form */}
               <form onSubmit={sendMessage} className="flex space-x-2 sm:space-x-4">
                 <div className="flex-1 relative">
                   <input
+                    ref={messageInputRef}
                     type="text"
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setNewMessage(newValue);
+                      handleMentionDetection(newValue, e.target.selectionStart);
+                    }}
+                    onKeyDown={(e) => {
+                      if (showUserSuggestions && userSuggestions.length > 0) {
+                        switch (e.key) {
+                          case 'ArrowUp':
+                            e.preventDefault();
+                            setSelectedSuggestionIndex(prev => 
+                              prev > 0 ? prev - 1 : userSuggestions.length - 1
+                            );
+                            break;
+                          case 'ArrowDown':
+                            e.preventDefault();
+                            setSelectedSuggestionIndex(prev => 
+                              prev < userSuggestions.length - 1 ? prev + 1 : 0
+                            );
+                            break;
+                          case 'Enter':
+                            e.preventDefault();
+                            if (userSuggestions[selectedSuggestionIndex]) {
+                              handleUserMention(userSuggestions[selectedSuggestionIndex]);
+                            }
+                            break;
+                          case 'Escape':
+                            setShowUserSuggestions(false);
+                            setUserSuggestions([]);
+                            setMentionQuery('');
+                            setSelectedSuggestionIndex(0);
+                            break;
+                          default:
+                            // Reset selection when typing
+                            setSelectedSuggestionIndex(0);
+                            break;
+                        }
+                      }
+                    }}
+                    onSelect={(e) => {
+                      // Handle cursor position changes for mention detection
+                      handleMentionDetection(e.target.value, e.target.selectionStart);
+                    }}
                     placeholder={
                       isConnected 
                         ? user?.role === 'student' 
-                          ? "Ask for interview help, share experiences..." 
-                          : "Share insights, help candidates..." 
+                          ? "Ask for interview help, share experiences... (Use @ to mention someone)" 
+                          : "Share insights, help candidates... (Use @ to mention someone)" 
                         : "Connecting..."
                     }
                     disabled={!isConnected}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2.5 sm:py-4 pr-8 sm:pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-700 bg-white/90 dark:bg-gray-700/90 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 backdrop-blur-sm transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base"
                   />
+                  
+                  {/* User Suggestions Dropdown for Mentions - Slack Style */}
+                  {showUserSuggestions && userSuggestions.length > 0 && (
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-60 overflow-y-auto z-50 backdrop-blur-sm">
+                      <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                          People you can mention
+                        </div>
+                      </div>
+                      {userSuggestions.map((suggestedUser, index) => (
+                        <button
+                          key={suggestedUser.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('Clicking on user:', suggestedUser.name);
+                            handleUserMention(suggestedUser);
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault(); // Prevent input blur
+                          }}
+                          className={`w-full text-left px-3 py-2 flex items-center space-x-3 transition-colors duration-150 group ${
+                            index === selectedSuggestionIndex 
+                              ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200' 
+                              : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                          }`}
+                        >
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white text-sm font-semibold shadow-sm">
+                            {suggestedUser.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              {suggestedUser.name}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                              @{suggestedUser.name.toLowerCase().replace(/\s+/g, '')} • {suggestedUser.email}
+                            </div>
+                          </div>
+                          <div className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                          </div>
+                        </button>
+                      ))}
+                      <div className="p-2 border-t border-gray-100 dark:border-gray-700">
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          Type to search or use ↑↓ to navigate
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2">
                     <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>

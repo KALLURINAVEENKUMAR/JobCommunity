@@ -27,6 +27,11 @@ const Signup = () => {
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -97,11 +102,78 @@ const Signup = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Email validation function
+  const isValidEmail = (email) => {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(email);
+  };
+
+  // Send OTP for email verification
+  const handleEmailVerification = async () => {
+    if (!formData.email) {
+      setErrors({ email: 'Email is required' });
+      return;
+    }
+
+    if (!isValidEmail(formData.email)) {
+      setErrors({ email: 'Please enter a valid email address' });
+      return;
+    }
+
+    setIsVerifyingEmail(true);
+    try {
+      // For demo purposes, we'll simulate OTP sending
+      // In production, you'd call your backend API to send actual OTP
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+      
+      setOtpSent(true);
+      setErrors({ email: '' });
+      window.showToast?.('OTP sent to your email address! Please check your inbox.', 'success');
+    } catch (error) {
+      setErrors({ email: 'Failed to send OTP. Please try again.' });
+    } finally {
+      setIsVerifyingEmail(false);
+    }
+  };
+
+  // Verify OTP
+  const handleOtpVerification = async () => {
+    if (!otp || otp.length !== 6) {
+      setErrors({ otp: 'Please enter a valid 6-digit OTP' });
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      // For demo purposes, accept any 6-digit OTP
+      // In production, verify with your backend
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (otp === '123456' || otp.length === 6) { // Demo: accept 123456 or any 6 digits
+        setEmailVerified(true);
+        setErrors({ otp: '' });
+        window.showToast?.('Email verified successfully! ✅', 'success');
+      } else {
+        setErrors({ otp: 'Invalid OTP. Please try again.' });
+      }
+    } catch (error) {
+      setErrors({ otp: 'Failed to verify OTP. Please try again.' });
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!role) {
       setErrors({ role: 'Please select a role' });
+      return;
+    }
+
+    if (!emailVerified) {
+      setErrors({ email: 'Please verify your email address first' });
+      window.showToast?.('Please verify your email before signing up', 'error');
       return;
     }
 
@@ -194,10 +266,72 @@ const Signup = () => {
                 value={formData.email}
                 onChange={handleInputChange}
                 required
+                disabled={emailVerified}
               />
               <span>Email</span>
+              {emailVerified && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
+                  ✅
+                </div>
+              )}
             </label>
             {errors.email && <p className="modern-error">{errors.email}</p>}
+            
+            {/* Email Verification Section */}
+            {!emailVerified && (
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={handleEmailVerification}
+                  disabled={isVerifyingEmail || !formData.email}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white py-2 px-4 rounded-lg font-semibold transition-all duration-200 disabled:cursor-not-allowed"
+                >
+                  {isVerifyingEmail ? 'Sending OTP...' : 'Verify Email'}
+                </button>
+                
+                {otpSent && (
+                  <div className="space-y-3">
+                    <label className="modern-label">
+                      <input
+                        className="modern-input text-center tracking-widest"
+                        type="text"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Enter 6-digit OTP"
+                        maxLength="6"
+                        required
+                      />
+                      <span>OTP Code</span>
+                    </label>
+                    {errors.otp && <p className="modern-error">{errors.otp}</p>}
+                    
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleOtpVerification}
+                        disabled={isVerifyingOtp || otp.length !== 6}
+                        className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg font-semibold transition-all duration-200 disabled:cursor-not-allowed"
+                      >
+                        {isVerifyingOtp ? 'Verifying...' : 'Verify OTP'}
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={handleEmailVerification}
+                        disabled={isVerifyingEmail}
+                        className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
+                      >
+                        Resend
+                      </button>
+                    </div>
+                    
+                    <p className="text-xs text-gray-500 text-center">
+                      Demo: Use any 6-digit code or "123456"
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
             
             <label className="modern-label relative">
               <input

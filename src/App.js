@@ -3,6 +3,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useEffect } from 'react';
 import { logout, initializeAuth } from './features/auth/userSlice';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
 import CompanyList from './pages/CompanyList';
@@ -74,6 +76,18 @@ function App() {
           <Route path="/companies" element={<CompanyList />} />
           <Route path="/chat/:companyId" element={<ChatRoom />} />
         </Routes>
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </Router>
     </ThemeProvider>
   );
