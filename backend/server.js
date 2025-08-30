@@ -46,12 +46,19 @@ app.use(express.json());
 
 // MongoDB connection
 const mongoUri = process.env.MONGODB_URI || process.env.DATABASE_URL || 'mongodb://localhost:27017/jobcommunity';
+console.log('Attempting to connect to MongoDB...');
 mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
+.then(() => {
+  console.log('✅ Connected to MongoDB successfully');
+  console.log('Database URI:', mongoUri.includes('mongodb+srv') ? 'MongoDB Atlas' : 'Local/Railway MongoDB');
+})
+.catch(err => {
+  console.error('❌ MongoDB connection error:', err);
+  console.error('Connection URI:', mongoUri.substring(0, 20) + '...');
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -71,6 +78,42 @@ app.get('/api/health', (req, res) => {
 // Test route
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is running!' });
+});
+
+// Initialize database with sample data
+app.post('/api/init', async (req, res) => {
+  try {
+    const Company = require('./models/Company');
+    
+    // Check if companies already exist
+    const existingCount = await Company.countDocuments();
+    if (existingCount > 0) {
+      return res.json({ 
+        message: 'Database already initialized', 
+        companiesCount: existingCount 
+      });
+    }
+
+    // Create sample companies
+    const sampleCompanies = [
+      { name: 'Sample Company', description: 'Example company for demonstration', memberCount: 1 },
+      { name: 'Google', description: 'Tech giant focusing on search and cloud services', memberCount: 245 },
+      { name: 'Microsoft', description: 'Software and cloud computing company', memberCount: 180 },
+      { name: 'Amazon', description: 'E-commerce and cloud computing platform', memberCount: 320 },
+      { name: 'Apple', description: 'Consumer electronics and software company', memberCount: 156 },
+      { name: 'Meta', description: 'Social media and virtual reality company', memberCount: 89 }
+    ];
+
+    await Company.insertMany(sampleCompanies);
+    
+    res.json({ 
+      message: 'Database initialized successfully!',
+      companiesAdded: sampleCompanies.length
+    });
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    res.status(500).json({ message: 'Error initializing database', error: error.message });
+  }
 });
 
 // Socket.IO connection handling
