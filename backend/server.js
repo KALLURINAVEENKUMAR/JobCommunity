@@ -91,11 +91,25 @@ app.get('/api/db-test', async (req, res) => {
       3: 'disconnecting'
     };
     
+    // Try a simple ping to test the connection
+    let pingResult = 'not tested';
+    try {
+      if (mongoose.connection.readyState === 1) {
+        await mongoose.connection.db.admin().ping();
+        pingResult = 'success';
+      }
+    } catch (pingError) {
+      pingResult = `failed: ${pingError.message}`;
+    }
+    
     res.json({ 
       message: 'Database connection test',
       mongoState: stateMap[dbState] || 'unknown',
       mongoUri: process.env.MONGODB_URI ? 'Set' : 'Not Set',
-      jwtSecret: process.env.JWT_SECRET ? 'Set' : 'Not Set'
+      jwtSecret: process.env.JWT_SECRET ? 'Set' : 'Not Set',
+      pingResult: pingResult,
+      connectionString: process.env.MONGODB_URI ? 
+        process.env.MONGODB_URI.substring(0, 50) + '...' : 'Not Set'
     });
   } catch (error) {
     res.status(500).json({ message: 'Database test failed', error: error.message });
