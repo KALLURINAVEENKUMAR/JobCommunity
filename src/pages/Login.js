@@ -71,75 +71,22 @@ const Login = () => {
       
       console.log('Login successful:', data);
         
-        // Ensure the user object has a token
-        const userWithToken = {
-          ...data.user,
-          token: data.token || data.user.token || `demo_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        };
-        
-        dispatch(login({ user: userWithToken, keepLoggedIn: formData.keepLoggedIn }));
-        window.showToast?.('Login successful! Welcome back! 🎉', 'success');
-        navigate('/companies');
-      } else {
-        const errorData = await response.json();
-        console.error('Login failed:', errorData);
-        dispatch(loginFailure(errorData.message || 'Login failed'));
-        setValidationErrors({ general: errorData.message || 'Login failed' });
-      }
+      // Ensure the user object has a token
+      const userWithToken = {
+        ...data.user,
+        token: data.token || data.user.token
+      };
+      
+      dispatch(login({ user: userWithToken, keepLoggedIn: formData.keepLoggedIn }));
+      window.showToast?.('Login successful! Welcome back! 🎉', 'success');
+      navigate('/companies');
+      
     } catch (error) {
       console.error('Login error:', error);
-      console.log('Backend not available, trying mock login...');
-      
-      // Mock login for demo purposes
-      if (formData.email && formData.password) {
-        // Generate a random company name for demo
-        const companies = ['Google', 'Microsoft', 'Apple', 'Amazon', 'Meta', 'Netflix', 'Tesla', 'Adobe', 'Salesforce', 'Oracle'];
-        const randomCompany = companies[Math.floor(Math.random() * companies.length)];
-        
-        const mockUser = {
-          id: Date.now(),
-          email: formData.email,
-          name: formData.email.split('@')[0],
-          role: 'professional',
-          companyName: randomCompany,
-          token: `demo_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        };
-        
-        dispatch(login({ user: mockUser, keepLoggedIn: formData.keepLoggedIn }));
-        window.showToast?.('Demo login successful! 🚀', 'success');
-        navigate('/companies');
-      } else {
-        dispatch(loginFailure('Please check your connection and try again.'));
-        setValidationErrors({ general: 'Please check your connection and try again.' });
-      }
+      dispatch(loginFailure(error.message || 'Login failed'));
+      setValidationErrors({ general: error.message || 'Login failed' });
     }
   };
-
-  // Mock login function - replace with actual API call
-  // const mockLogin = (email, password) => {
-  //   return new Promise((resolve) => {
-  //     setTimeout(() => {
-  //       // Mock successful login
-  //       if (email && password) {
-  //         resolve({
-  //           success: true,
-  //           user: {
-  //             id: 1,
-  //             email: email,
-  //             role: 'professional', // or 'student'
-  //             name: 'John Doe'
-  //           },
-  //           token: 'mock-jwt-token-' + Date.now()
-  //         });
-  //       } else {
-  //         resolve({
-  //           success: false,
-  //           message: 'Invalid email or password'
-  //         });
-  //       }
-  //     }, 1000); // Simulate network delay
-  //   });
-  // };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
