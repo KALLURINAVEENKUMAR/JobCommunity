@@ -5,6 +5,7 @@ import { logout } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import UserProfile from '../components/UserProfile';
+import ApiService from '../utils/apiService';
 
 const CompanyList = () => {
   const { companies } = useSelector(state => state.company);
@@ -57,7 +58,7 @@ const CompanyList = () => {
     // Load companies from API
     const fetchCompanies = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/companies');
+        const companiesData = await ApiService.getCompanies();
         if (response.ok) {
           const companiesData = await response.json();
           // Ensure all company names are properly capitalized
