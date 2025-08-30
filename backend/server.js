@@ -80,6 +80,28 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is running!' });
 });
 
+// Test database connection
+app.get('/api/db-test', async (req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState;
+    const stateMap = {
+      0: 'disconnected',
+      1: 'connected', 
+      2: 'connecting',
+      3: 'disconnecting'
+    };
+    
+    res.json({ 
+      message: 'Database connection test',
+      mongoState: stateMap[dbState] || 'unknown',
+      mongoUri: process.env.MONGODB_URI ? 'Set' : 'Not Set',
+      jwtSecret: process.env.JWT_SECRET ? 'Set' : 'Not Set'
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Database test failed', error: error.message });
+  }
+});
+
 // Initialize database with sample data
 app.post('/api/init', async (req, res) => {
   try {
