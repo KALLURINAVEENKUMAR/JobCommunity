@@ -59,40 +59,31 @@ const CompanyList = () => {
     const fetchCompanies = async () => {
       try {
         const companiesData = await ApiService.getCompanies();
-        if (response.ok) {
-          const companiesData = await response.json();
-          // Ensure all company names are properly capitalized
+        // Ensure all company names are properly capitalized
+        const capitalizedCompanies = companiesData.map(company => ({
+          ...company,
+          name: capitalizeCompanyName(company.name)
+        }));
+        dispatch(setCompanies(sortCompaniesAlphabetically(capitalizedCompanies)));
+      } catch (error) {
+        console.error('Failed to fetch companies:', error);
+        // If no companies exist, try seeding them first
+        try {
+          await ApiService.seedCompanies();
+          const companiesData = await ApiService.getCompanies();
           const capitalizedCompanies = companiesData.map(company => ({
             ...company,
             name: capitalizeCompanyName(company.name)
           }));
           dispatch(setCompanies(sortCompaniesAlphabetically(capitalizedCompanies)));
-        } else {
-          // If no companies exist, seed them first
-          const seedResponse = await fetch('http://localhost:5000/api/companies/seed', {
-            method: 'POST'
-          });
-          if (seedResponse.ok) {
-            // Fetch companies again after seeding
-            const companiesResponse = await fetch('http://localhost:5000/api/companies');
-            if (companiesResponse.ok) {
-              const companiesData = await companiesResponse.json();
-              // Ensure all company names are properly capitalized
-              const capitalizedCompanies = companiesData.map(company => ({
-                ...company,
-                name: capitalizeCompanyName(company.name)
-              }));
-              dispatch(setCompanies(sortCompaniesAlphabetically(capitalizedCompanies)));
-            }
-          }
+        } catch (seedError) {
+          console.error('Failed to seed companies:', seedError);
+          // Fallback to minimal mock data if API fails
+          const mockCompanies = [
+            { id: 1, name: 'Sample Company', memberCount: 0, description: 'Example company for demonstration' }
+          ];
+          dispatch(setCompanies(sortCompaniesAlphabetically(mockCompanies)));
         }
-      } catch (error) {
-        console.error('Failed to fetch companies:', error);
-        // Fallback to minimal mock data if API fails
-        const mockCompanies = [
-          { id: 1, name: 'Sample Company', memberCount: 0, description: 'Example company for demonstration' }
-        ];
-        dispatch(setCompanies(sortCompaniesAlphabetically(mockCompanies)));
       }
     };
 
@@ -119,30 +110,17 @@ const CompanyList = () => {
       
       try {
         
-        const response = await fetch('http://localhost:5000/api/companies', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${user.token}`,
-          },
-          body: JSON.stringify({
-            name: capitalizedName,
-            description: `Discussion forum for ${capitalizedName}`
-          }),
+        const newCompany = await ApiService.createCompany({
+          name: capitalizedName,
+          description: `Discussion forum for ${capitalizedName}`
         });
 
-        if (response.ok) {
-          const newCompany = await response.json();
-          dispatch(setCompanies(sortCompaniesAlphabetically([...companies, newCompany])));
-          setNewCompanyName('');
-          setShowAddCompany(false);
-          
-          // Navigate to the new company's chat room
-          navigate(`/chat/${newCompany.id}`);
-        } else {
-          const errorData = await response.json();
-          alert(errorData.message || 'Failed to create company');
-        }
+        dispatch(setCompanies(sortCompaniesAlphabetically([...companies, newCompany])));
+        setNewCompanyName('');
+        setShowAddCompany(false);
+        
+        // Navigate to the new company's chat room
+        navigate(`/chat/${newCompany.id}`);
       } catch (error) {
         console.error('Error creating company:', error);
         alert('Failed to create company. Please try again.');

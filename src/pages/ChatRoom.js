@@ -196,25 +196,20 @@ const ChatRoom = () => {
 
   const loadCompanies = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/companies');
-      if (response.ok) {
-        const companies = await response.json();
-        dispatch(setCompanies(companies));
-        return companies; // Return companies for use in initialization
-      } else {
-        // Fallback to mock data
-        const mockCompanies = [
-          { id: 1, name: 'Google', memberCount: 245, description: 'Tech giant focusing on search and cloud services' },
-          { id: 2, name: 'Microsoft', memberCount: 180, description: 'Software and cloud computing company' },
-          { id: 3, name: 'Amazon', memberCount: 320, description: 'E-commerce and cloud computing platform' },
-          { id: 4, name: 'Apple', memberCount: 156, description: 'Consumer electronics and software company' }
-        ];
-        dispatch(setCompanies(mockCompanies));
-        return mockCompanies;
-      }
+      const companies = await ApiService.getCompanies();
+      dispatch(setCompanies(companies));
+      return companies; // Return companies for use in initialization
     } catch (error) {
-      console.error('Failed to load companies:', error);
-      return [];
+      console.error('Error loading companies:', error);
+      // Fallback to mock data
+      const mockCompanies = [
+        { id: 1, name: 'Google', memberCount: 245, description: 'Tech giant focusing on search and cloud services' },
+        { id: 2, name: 'Microsoft', memberCount: 180, description: 'Software and cloud computing company' },
+        { id: 3, name: 'Amazon', memberCount: 320, description: 'E-commerce and cloud computing platform' },
+        { id: 4, name: 'Apple', memberCount: 156, description: 'Consumer electronics and software company' }
+      ];
+      dispatch(setCompanies(mockCompanies));
+      return mockCompanies;
     }
   };
 
@@ -231,12 +226,9 @@ const ChatRoom = () => {
 
   const loadMessages = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/messages/${companyId}`);
-      if (response.ok) {
-        const messagesData = await response.json();
-        dispatch(setMessages(messagesData));
-        return;
-      }
+      const messagesData = await ApiService.getMessages(companyId);
+      dispatch(setMessages(messagesData));
+      return;
     } catch (error) {
       console.error('Failed to load messages from API:', error);
     }
@@ -291,35 +283,14 @@ const ChatRoom = () => {
 
     try {
       // Send to backend API first
-      const response = await fetch('http://localhost:5000/api/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.token}`
-        },
-        body: JSON.stringify(messageData)
-      });
+      await ApiService.sendMessage(messageData);
 
       console.log('📤 Sending message via API:', messageData);
-      
-      if (response.ok) {
-        console.log('✅ API success, emitting via socket');
-        // Only emit via socket - don't add to local state
-        // Socket.IO will broadcast the message back to all clients including sender
-        if (socketRef.current) {
-          socketRef.current.emit('send-message', messageData);
-        }
-      } else {
-        console.warn('❌ API failed, using fallback for frontend-only company');
-        // Fallback for frontend-only companies (like the popular companies we added)
-        // Track this message ID to prevent duplicates when it comes back via socket
-        localMessageIds.current.add(messageData.id);
-        
-        // Add to local state immediately and emit via socket
-        dispatch(addMessage(messageData));
-        if (socketRef.current) {
-          socketRef.current.emit('send-message', messageData);
-        }
+      console.log('✅ API success, emitting via socket');
+      // Only emit via socket - don't add to local state
+      // Socket.IO will broadcast the message back to all clients including sender
+      if (socketRef.current) {
+        socketRef.current.emit('send-message', messageData);
       }
     } catch (error) {
       console.error('❌ API error, using fallback for frontend-only company:', error);
@@ -351,32 +322,21 @@ const ChatRoom = () => {
 
     try {
       // Call API to edit message
-      const response = await fetch(`http://localhost:5000/api/messages/${messageId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.token}`
-        },
-        body: JSON.stringify({
-          text: editingText.trim(),
-          userId: user?.id || user?.email
-        })
+      await ApiService.editMessage(messageId, {
+        text: editingText.trim(),
+        userId: user?.id || user?.email
       });
 
-      if (response.ok) {
-        // Emit via socket for real-time updates
-        if (socketRef.current) {
-          socketRef.current.emit('edit-message', {
-            messageId,
-            newText: editingText.trim(),
-            userId: user?.id || user?.email,
-            companyId: companyId
-          });
-        }
-        cancelEdit();
-      } else {
-        alert('Failed to edit message. Please try again.');
+      // Emit via socket for real-time updates
+      if (socketRef.current) {
+        socketRef.current.emit('edit-message', {
+          messageId,
+          newText: editingText.trim(),
+          userId: user?.id || user?.email,
+          companyId: companyId
+        });
       }
+      cancelEdit();
     } catch (error) {
       console.error('Failed to edit message:', error);
       alert('Failed to edit message. Please try again.');
@@ -388,28 +348,15 @@ const ChatRoom = () => {
 
     try {
       // Call API to delete message
-      const response = await fetch(`http://localhost:5000/api/messages/${messageId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.token}`
-        },
-        body: JSON.stringify({
-          userId: user?.id || user?.email
-        })
-      });
-
-      if (response.ok) {
-        // Emit via socket for real-time updates
-        if (socketRef.current) {
-          socketRef.current.emit('delete-message', {
-            messageId,
-            userId: user?.id || user?.email,
-            companyId: companyId
-          });
-        }
-      } else {
-        alert('Failed to delete message. Please try again.');
+      await ApiService.deleteMessage(messageId);
+      
+      // Emit via socket for real-time updates
+      if (socketRef.current) {
+        socketRef.current.emit('delete-message', {
+          messageId,
+          userId: user?.id || user?.email,
+          companyId: companyId
+        });
       }
     } catch (error) {
       console.error('Failed to delete message:', error);
