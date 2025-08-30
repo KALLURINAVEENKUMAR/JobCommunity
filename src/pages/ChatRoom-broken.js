@@ -15,6 +15,9 @@ const ChatRoom = () => {
   const { user, isAuthenticated } = useSelector(state => state.user);
   const { messages } = useSelector(state => state.chat);
   const { companies } = useSelector(state => state.company);
+  
+  // Determine if this is a group chat or company chat
+  const isGroupChat = !!groupId;
   // const { theme } = useTheme();
   
   const [newMessage, setNewMessage] = useState('');
@@ -34,12 +37,10 @@ const ChatRoom = () => {
   // User tagging states
   const [showUserSuggestions, setShowUserSuggestions] = useState(false);
   const [userSuggestions, setUserSuggestions] = useState([]);
-  const [mentionQuery, setMentionQuery] = useState('');
   const [allUsers, setAllUsers] = useState([]); // All users in the database
   
   // Reply states
   const [replyingTo, setReplyingTo] = useState(null);
-  const [swipedMessageId, setSwipedMessageId] = useState(null);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   
   const messagesEndRef = useRef(null);
@@ -53,62 +54,47 @@ const ChatRoom = () => {
     c.id === companyId
   );
 
-  // Determine if we're in a group chat or company chat
-  const isGroupChat = !!groupId;
-  const chatId = isGroupChat ? groupId : companyId;
-
-  // Load group data if we're in a group chat
-  useEffect(() => {
-    if (isGroupChat && groupId) {
-      const loadGroup = async () => {
-        try {
-          const group = await ApiService.getGroup(groupId);
-          setCurrentGroup(group);
-        } catch (error) {
-          console.error('Failed to load group:', error);
-          // If group doesn't exist, redirect to groups page
-          navigate('/groups');
-        }
-      };
-      loadGroup();
-    }
-  }, [isGroupChat, groupId, navigate]);
-
-  // Save messages to localStorage whenever messages change
-  useEffect(() => {
-    if (messages.length > 0) {
-      saveMessagesToLocalStorage(messages);
-    }
-  }, [messages]);
-
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
 
-    // Load companies first, then messages and socket
+    // Load data first, then messages and socket
     const initializeChat = async () => {
       setIsLoading(true);
       
       try {
-        // Load companies if not already loaded
-        let currentCompanies = companies;
-        if (companies.length === 0) {
-          currentCompanies = await loadCompanies();
-        }
-        
-        // Find the company for this chat
-        const company = currentCompanies.find(c => 
-          c.id === companyId || 
-          c._id === companyId || 
-          c.id === parseInt(companyId)
-        );
-        
-        if (!company) {
-          console.error('Company not found:', companyId);
-          setIsLoading(false);
-          return;
+        if (isGroupChat) {
+          // Load group information
+          const groupData = await ApiService.getGroup(groupId);
+          setCurrentGroup(groupData);
+          
+          // Check if user is a member of this group
+          if (!groupData.members.some(member => member.email === user.email)) {
+            console.error('User is not a member of this group');
+            navigate('/groups');
+            return;
+          }
+        } else {
+          // Load companies if not already loaded
+          let currentCompanies = companies;
+          if (companies.length === 0) {
+            currentCompanies = await loadCompanies();
+          }
+          
+          // Find the company for this chat
+          const company = currentCompanies.find(c => 
+            c.id === companyId || 
+            c._id === companyId || 
+            c.id === parseInt(companyId)
+          );
+          
+          if (!company) {
+            console.error('Company not found:', companyId);
+            setIsLoading(false);
+            return;
+          }
         }
         
         // Load messages and initialize socket
@@ -116,6 +102,9 @@ const ChatRoom = () => {
         initializeSocket();
       } catch (error) {
         console.error('Error initializing chat:', error);
+        if (isGroupChat) {
+          navigate('/groups');
+        }
       }
       
       setIsLoading(false);
@@ -128,7 +117,7 @@ const ChatRoom = () => {
         socketRef.current.disconnect();
       }
     };
-  }, [isAuthenticated, navigate, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, navigate, companyId, groupId, isGroupChat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     scrollToBottom();
@@ -153,7 +142,6 @@ const ChatRoom = () => {
     
     if (mentionMatch) {
       const query = mentionMatch[1].toLowerCase();
-      setMentionQuery(query);
       
       // Filter users based on query
       const filtered = allUsers.filter(user => 
@@ -166,7 +154,6 @@ const ChatRoom = () => {
     } else {
       setShowUserSuggestions(false);
       setUserSuggestions([]);
-      setMentionQuery('');
       setSelectedSuggestionIndex(0);
     }
   };
@@ -211,7 +198,6 @@ const ChatRoom = () => {
       
       setShowUserSuggestions(false);
       setUserSuggestions([]);
-      setMentionQuery('');
       setSelectedSuggestionIndex(0);
     } else {
       console.log('No mention match found, adding mention at end');
@@ -230,7 +216,6 @@ const ChatRoom = () => {
       
       setShowUserSuggestions(false);
       setUserSuggestions([]);
-      setMentionQuery('');
       setSelectedSuggestionIndex(0);
     }
   };
@@ -327,13 +312,14 @@ const ChatRoom = () => {
       setIsConnected(true);
       console.log('Connected to Socket.IO server');
       
-      // Join the appropriate room based on chat type
       if (isGroupChat) {
+        // Join the group room
         socketRef.current.emit('join-group', {
           groupId: groupId,
           user: user
         });
       } else {
+        // Join the company room
         socketRef.current.emit('join-company', {
           companyId: companyId,
           user: user
@@ -431,12 +417,12 @@ const ChatRoom = () => {
     }
   };
 
-  // Helper function to save messages to localStorage for frontend-only companies and groups
+  // Helper function to save messages to localStorage for frontend-only companies
   const saveMessagesToLocalStorage = (messages) => {
     try {
-      const localStorageKey = isGroupChat ? `messages_group_${groupId}` : `messages_${companyId}`;
+      const localStorageKey = `messages_${companyId}`;
       localStorage.setItem(localStorageKey, JSON.stringify(messages));
-      console.log(`💾 Saved ${messages.length} messages to localStorage for ${isGroupChat ? 'group' : 'company'} ${chatId}`);
+      console.log(`💾 Saved ${messages.length} messages to localStorage for company ${companyId}`);
     } catch (error) {
       console.error('Failed to save messages to localStorage:', error);
     }
@@ -444,38 +430,47 @@ const ChatRoom = () => {
 
   const loadMessages = async () => {
     try {
-      let messagesData;
       if (isGroupChat) {
-        messagesData = await ApiService.getGroupMessages(groupId);
+        // Load group messages
+        const messagesData = await ApiService.getGroupMessages(groupId);
+        dispatch(setMessages(messagesData));
+        return;
       } else {
-        messagesData = await ApiService.getMessages(companyId);
+        // Load company messages
+        const messagesData = await ApiService.getMessages(companyId);
+        dispatch(setMessages(messagesData));
+        return;
       }
-      dispatch(setMessages(messagesData));
-      return;
     } catch (error) {
       console.error('Failed to load messages from API:', error);
     }
     
-    // Fallback: Load messages from localStorage for frontend-only companies
-    const localStorageKey = isGroupChat ? `messages_group_${groupId}` : `messages_${companyId}`;
-    const savedMessages = localStorage.getItem(localStorageKey);
-    
-    if (savedMessages) {
-      try {
-        const parsedMessages = JSON.parse(savedMessages);
-        console.log(`📱 Loaded ${parsedMessages.length} messages from localStorage for ${isGroupChat ? 'group' : 'company'} ${chatId}`);
-        dispatch(setMessages(parsedMessages));
-        return;
-      } catch (parseError) {
-        console.error('Failed to parse saved messages:', parseError);
+    // Fallback: Load messages from localStorage for frontend-only companies (only for company chats)
+    if (!isGroupChat) {
+      const localStorageKey = `messages_${companyId}`;
+      const savedMessages = localStorage.getItem(localStorageKey);
+      
+      if (savedMessages) {
+        try {
+          const parsedMessages = JSON.parse(savedMessages);
+          console.log(`📱 Loaded ${parsedMessages.length} messages from localStorage for company ${companyId}`);
+          dispatch(setMessages(parsedMessages));
+          return;
+        } catch (parseError) {
+          console.error('Failed to parse saved messages:', parseError);
+        }
       }
     }
     
     // If no saved messages, load welcome message
+    const welcomeText = isGroupChat 
+      ? `Welcome to the group chat! 🎉`
+      : `Welcome to the discussion room! 🎉`;
+      
     const mockMessages = [
       {
         id: 1,
-        text: `Welcome to the discussion room! 🎉`,
+        text: welcomeText,
         userId: 'system',
         userName: 'System',
         userRole: 'system',
@@ -520,7 +515,7 @@ const ChatRoom = () => {
       companyName: user?.companyName,
       college: user?.college,
       timestamp: Date.now(),
-      ...(isGroupChat ? { groupId: groupId } : { companyId: companyId }), // Use appropriate ID
+      ...(isGroupChat ? { groupId } : { companyId }), // Use appropriate ID based on chat type
       mentions: mentions, // Add mentions to message data
       replyTo: replyingTo ? {
         messageId: replyingTo.id,
@@ -533,12 +528,12 @@ const ChatRoom = () => {
     try {
       // Send to backend API first
       if (isGroupChat) {
-        await ApiService.sendGroupMessage(messageData);
+        await ApiService.sendGroupMessage(groupId, messageData);
       } else {
         await ApiService.sendMessage(messageData);
       }
 
-      console.log(`📤 Sending message via API to ${isGroupChat ? 'group' : 'company'}:`, messageData);
+      console.log('📤 Sending message via API:', messageData);
       if (mentions.length > 0) {
         console.log('👥 Message contains mentions:', mentions);
       }
@@ -546,17 +541,22 @@ const ChatRoom = () => {
       // Only emit via socket - don't add to local state
       // Socket.IO will broadcast the message back to all clients including sender
       if (socketRef.current) {
-        socketRef.current.emit('send-message', messageData);
+        if (isGroupChat) {
+          socketRef.current.emit('send-group-message', messageData);
+        } else {
+          socketRef.current.emit('send-message', messageData);
+        }
       }
     } catch (error) {
-      console.error('❌ API error, using fallback for frontend-only company:', error);
-      // Fallback for when backend is not available
-      // Track this message ID to prevent duplicates when it comes back via socket
-      localMessageIds.current.add(messageData.id);
-      
-      dispatch(addMessage(messageData));
-      if (socketRef.current) {
-        socketRef.current.emit('send-message', messageData);
+      console.error('❌ API error, using fallback:', error);
+      if (!isGroupChat) {
+        // Fallback only for company chats
+        localMessageIds.current.add(messageData.id);
+        
+        dispatch(addMessage(messageData));
+        if (socketRef.current) {
+          socketRef.current.emit('send-message', messageData);
+        }
       }
     }
     
@@ -638,7 +638,7 @@ const ChatRoom = () => {
 
   const showNotification = (message) => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(`New message in ${currentCompany?.name}`, {
+      new Notification(`New message in ${isGroupChat ? currentGroup?.name || 'Group' : currentCompany?.name}`, {
         body: `${message.userName}: ${message.text}`,
         icon: '/logo192.png',
         badge: '/logo192.png'
@@ -783,12 +783,14 @@ const ChatRoom = () => {
     );
   }
 
-  // Swipe and Reply Functions
+  // Swipe and Reply Functions - Improved for smooth interaction
   const handleSwipeStart = (messageId, e) => {
     const touch = e.touches[0];
     const message = e.currentTarget;
     message.startX = touch.clientX;
+    message.startY = touch.clientY;
     message.startTime = Date.now();
+    message.style.transition = 'none'; // Remove transition during swipe
   };
 
   const handleSwipeMove = (messageId, e) => {
@@ -797,11 +799,25 @@ const ChatRoom = () => {
     if (!message.startX) return;
 
     const diffX = touch.clientX - message.startX;
-    const maxSwipe = 80;
+    const diffY = touch.clientY - message.startY;
+    const maxSwipe = 100;
     
-    if (diffX > 0 && diffX <= maxSwipe) {
-      message.style.transform = `translateX(${diffX}px)`;
-      message.style.backgroundColor = diffX > 40 ? 'rgba(59, 130, 246, 0.1)' : 'transparent';
+    // Only allow horizontal swipe if it's more horizontal than vertical
+    if (Math.abs(diffX) > Math.abs(diffY) && diffX > 0 && diffX <= maxSwipe) {
+      e.preventDefault(); // Prevent scrolling
+      
+      const progress = Math.min(diffX / maxSwipe, 1);
+      const scale = 0.95 + (progress * 0.05);
+      
+      message.style.transform = `translateX(${diffX}px) scale(${scale})`;
+      message.style.backgroundColor = diffX > 30 
+        ? `rgba(59, 130, 246, ${0.05 + (progress * 0.15)})` 
+        : 'transparent';
+      
+      // Add visual feedback
+      if (diffX > 50) {
+        message.style.boxShadow = `0 4px 20px rgba(59, 130, 246, ${progress * 0.3})`;
+      }
     }
   };
 
@@ -811,20 +827,36 @@ const ChatRoom = () => {
     if (!messageElement.startX) return;
 
     const diffX = touch.clientX - messageElement.startX;
+    const diffY = touch.clientY - messageElement.startY;
     const timeDiff = Date.now() - messageElement.startTime;
     
-    // Reset transform
-    messageElement.style.transform = 'translateX(0)';
-    messageElement.style.backgroundColor = 'transparent';
+    // Add smooth transition back
+    messageElement.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
     
-    // If swiped right more than 60px and quickly (under 300ms)
-    if (diffX > 60 && timeDiff < 300) {
+    // Reset transform with animation
+    messageElement.style.transform = 'translateX(0) scale(1)';
+    messageElement.style.backgroundColor = 'transparent';
+    messageElement.style.boxShadow = 'none';
+    
+    // Trigger reply if swiped enough (reduced threshold for easier activation)
+    const isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
+    if (isHorizontalSwipe && diffX > 40 && timeDiff < 500) { // Reduced from 60px to 40px, increased time to 500ms
       setReplyingTo(message);
       messageInputRef.current?.focus();
+      
+      // Haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
     }
     
-    // Clean up
+    // Clean up after animation
+    setTimeout(() => {
+      messageElement.style.transition = '';
+    }, 300);
+    
     delete messageElement.startX;
+    delete messageElement.startY;
     delete messageElement.startTime;
   };
 
@@ -837,14 +869,15 @@ const ChatRoom = () => {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-gray-700/50 flex-shrink-0">
+    <div className="relative">
+      <div className="h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
+      {/* Fixed Header */}
+      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-gray-700/50 flex-shrink-0 sticky top-0 z-10">
         <div className="w-full px-3 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3 sm:py-6">
             <div className="flex items-center min-w-0 flex-1">
               <button
-                onClick={() => navigate('/companies')}
+                onClick={() => navigate(isGroupChat ? '/groups' : '/companies')}
                 className="mr-2 sm:mr-4 p-1.5 sm:p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 flex-shrink-0"
               >
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -853,18 +886,14 @@ const ChatRoom = () => {
               </button>
               <div className="min-w-0 flex-1">
                 <h1 className="text-base sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent truncate">
-                  {isGroupChat 
-                    ? (currentGroup ? `${currentGroup.name} Group` : 'Private Group') 
-                    : `${currentCompany.name} Discussion Room`
-                  }
+                  {isGroupChat ? `${currentGroup?.name || 'Group Chat'} 👥` : `${currentCompany?.name} Discussion Room`}
                 </h1>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-1 truncate">
-                  {isGroupChat
-                    ? (currentGroup ? `Private group • ${currentGroup.members?.length || 0} members` : 'Loading group...')
-                    : (user?.role === 'student' 
-                      ? `Ask ${currentCompany.name} employees for interview help and guidance`
-                      : `Help job seekers and share insights about ${currentCompany.name}`
-                    )
+                  {isGroupChat 
+                    ? `Private group • ${currentGroup?.members?.length || 0} members`
+                    : user?.role === 'student' 
+                      ? `Ask ${currentCompany?.name} employees for interview help and guidance`
+                      : `Help job seekers and share insights about ${currentCompany?.name}`
                   }
                 </p>
                 <div className="flex items-center space-x-3 sm:space-x-6 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">
@@ -934,14 +963,11 @@ const ChatRoom = () => {
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 min-h-0">
-        <div className="h-full w-full px-2 sm:px-4 lg:px-8">
-          <div className="h-full flex flex-col">
-            {/* Messages List */}
-            <div className="flex-1 overflow-y-auto py-3 sm:py-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scroll-smooth"
-                 style={{ maxHeight: 'calc(100vh - 200px)' }}>
-              <div className="min-h-full space-y-2 sm:space-y-3">
+      {/* Main Content Area - Scrollable Messages */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Messages Container */}
+        <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-8 py-3 sm:py-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scroll-smooth">
+          <div className="space-y-2 sm:space-y-3">
               {messages.map((message) => {
                 const isInterviewHelp = message.userRole === 'student' && 
                   (message.text.toLowerCase().includes('interview') || 
@@ -1085,7 +1111,10 @@ const ChatRoom = () => {
                               <strong>Quick Response Opportunity:</strong>
                             </p>
                             <p className="text-xs text-blue-800 dark:text-blue-200">
-                              Share your {currentCompany?.name} experience or offer guidance!
+                              {isGroupChat 
+                                ? "Share your thoughts or help group members!"
+                                : `Share your ${currentCompany?.name} experience or offer guidance!`
+                              }
                             </p>
                           </div>
                         </div>
@@ -1096,29 +1125,29 @@ const ChatRoom = () => {
                 );
               })}
               <div ref={messagesEndRef} />
-              </div>
-            </div>
+          </div>
+        </div>
 
-            {/* Message Input Area */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-t border-gray-200/50 dark:border-gray-700/50 p-3 sm:p-6 shadow-lg flex-shrink-0">
-              
-              {/* Reply Preview */}
-              {replyingTo && (
-                <div className="mb-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-3 rounded-r-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
-                        Replying to {replyingTo.userName}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                        {replyingTo.text}
-                      </div>
-                    </div>
-                    <button
-                      onClick={cancelReply}
-                      className="ml-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Fixed Message Input Area */}
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-t border-gray-200/50 dark:border-gray-700/50 p-3 sm:p-6 shadow-lg flex-shrink-0">
+          
+          {/* Reply Preview */}
+          {replyingTo && (
+            <div className="mb-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-3 rounded-r-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
+                    Replying to {replyingTo.userName}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                    {replyingTo.text}
+                  </div>
+                </div>
+                <button
+                  onClick={cancelReply}
+                  className="ml-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                       </svg>
                     </button>
@@ -1162,7 +1191,6 @@ const ChatRoom = () => {
                           case 'Escape':
                             setShowUserSuggestions(false);
                             setUserSuggestions([]);
-                            setMentionQuery('');
                             setSelectedSuggestionIndex(0);
                             break;
                           default:
@@ -1178,9 +1206,11 @@ const ChatRoom = () => {
                     }}
                     placeholder={
                       isConnected 
-                        ? user?.role === 'student' 
-                          ? "Ask for interview help, share experiences... (Use @ to mention someone)" 
-                          : "Share insights, help candidates... (Use @ to mention someone)" 
+                        ? isGroupChat
+                          ? "Message the group... (Use @ to mention someone)"
+                          : user?.role === 'student' 
+                            ? "Ask for interview help, share experiences... (Use @ to mention someone)" 
+                            : "Share insights, help candidates... (Use @ to mention someone)" 
                         : "Connecting..."
                     }
                     disabled={!isConnected}

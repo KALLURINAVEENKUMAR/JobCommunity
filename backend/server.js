@@ -11,6 +11,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const companyRoutes = require('./routes/companies');
 const messageRoutes = require('./routes/messages');
+const groupRoutes = require('./routes/groups');
 
 // Import models
 const Message = require('./models/Message');
@@ -64,6 +65,7 @@ mongoose.connect(mongoUri, {
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/groups', groupRoutes);
 
 // Health check endpoint for deployment platforms
 app.get('/api/health', (req, res) => {
@@ -182,7 +184,19 @@ io.on('connection', (socket) => {
     io.to(`company_${companyId}`).emit('online-users', companyUsers);
   });
 
-  // Handle sending messages
+  // Join group room
+  socket.on('join-group', ({ groupId, user }) => {
+    socket.join(`group_${groupId}`);
+    console.log(`User ${user.email} joined group ${groupId}`);
+    
+    // Broadcast online users in this group
+    const groupUsers = Array.from(connectedUsers.values())
+      .filter(u => u.groupId === groupId);
+    
+    io.to(`group_${groupId}`).emit('online-users', groupUsers);
+  });
+
+  // Handle sending company messages
   socket.on('send-message', async (messageData) => {
     console.log('🔵 Socket received send-message:', messageData);
     try {
@@ -200,7 +214,7 @@ io.on('connection', (socket) => {
       console.log('💾 Message saved to database:', message._id);
       
       // Check if this is a help request from a student about interviews
-      const isInterviewHelp = messageData.userRole === 'student' && 
+      const isInterviewHelp = messageData.userRole === 'student' &&
         (messageData.text.toLowerCase().includes('interview') || 
          messageData.text.toLowerCase().includes('help') ||
          messageData.text.toLowerCase().includes('tomorrow') ||
@@ -258,6 +272,42 @@ io.on('connection', (socket) => {
       console.log(`✅ Message sent in company ${messageData.companyId} by ${messageData.userName}`);
     } catch (error) {
       console.error('Error saving message:', error);
+    }
+  });
+
+  // Handle sending group messages
+  socket.on('send-group-message', async (messageData) => {
+    console.log('🔵 Socket received send-group-message:', messageData);
+    try {
+      // Import GroupMessage model if not already imported
+      const GroupMessage = require('./models/GroupMessage');
+      
+      // Save message to database
+      const message = new GroupMessage({
+        text: messageData.text,
+        userId: messageData.userId,
+        userName: messageData.userName,
+        userRole: messageData.userRole,
+        userEmail: messageData.userEmail,
+        groupId: messageData.groupId,
+        mentions: messageData.mentions,
+        replyTo: messageData.replyTo,
+        timestamp: new Date()
+      });
+      
+      await message.save();
+      console.log('💾 Group message saved to database:', message._id);
+      
+      // Broadcast the message to all users in the group
+      io.to(`group_${messageData.groupId}`).emit('new-message', {
+        ...messageData,
+        id: message._id,
+        timestamp: message.timestamp
+      });
+      
+      console.log(`✅ Message sent in group ${messageData.groupId} by ${messageData.userName}`);
+    } catch (error) {
+      console.error('Error saving group message:', error);
     }
   });
 

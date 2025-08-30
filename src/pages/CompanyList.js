@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import UserProfile from '../components/UserProfile';
 import ApiService from '../utils/apiService';
+import { Building2 } from 'lucide-react';
 
 const CompanyList = () => {
   const { companies } = useSelector(state => state.company);
@@ -170,17 +171,26 @@ const CompanyList = () => {
           <div className="flex justify-between items-center py-4 sm:py-6">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
               <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
+                <div className="flex-shrink-0">
+                  {/* Stylish Navinity Branding */}
+                  <div className="flex items-center space-x-2 group">
+                    <div className="relative">
+                      <Building2 className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors duration-300" />
+                      <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg blur opacity-20 group-hover:opacity-30 transition duration-300"></div>
+                    </div>
+                    <div className="hidden sm:block">
+                      <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
+                        Navinity
+                      </h1>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        Merge. Motivate. Manifest
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent truncate">
-                    Navinity
-                  </h1>
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">
-                    Connect with professionals and discover career opportunities
+                <div className="min-w-0 sm:hidden">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
+                    Merge. Motivate. Manifest
                   </p>
                 </div>
               </div>
@@ -203,6 +213,15 @@ const CompanyList = () => {
                 </div>
               </div>
               
+              <button
+                onClick={() => navigate('/groups')}
+                className="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white px-3 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 transform hover:scale-105 shadow-lg"
+                title="My Groups"
+              >
+                <span className="hidden sm:inline">My Groups</span>
+                <span className="sm:hidden">👥</span>
+              </button>
+
               <button
                 onClick={() => setShowProfile(true)}
                 className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-3 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 transform hover:scale-105 shadow-lg"

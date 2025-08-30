@@ -4,6 +4,8 @@ import { login, loginStart, loginFailure } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import ApiService from '../utils/apiService';
+import '../styles/modern-form.css';
+import { Building2, Sparkles } from 'lucide-react';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -110,6 +112,24 @@ const Login = () => {
       <div className="auth-form-wrapper">
         <div className="modern-form">
           <form onSubmit={handleSubmit}>
+            {/* Stylish Navinity Logo */}
+            <div className="flex justify-center items-center mb-6">
+              <div className="flex items-center space-x-3 group">
+                <div className="relative">
+                  <Building2 className="w-10 h-10 text-blue-500 dark:text-blue-400 group-hover:rotate-12 transition-transform duration-300" />
+                  <Sparkles className="w-4 h-4 text-yellow-400 absolute -top-1 -right-1 animate-pulse" />
+                </div>
+                <div className="text-center">
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
+                    Navinity
+                  </h1>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-medium tracking-wide">
+                    Connect • Grow • Succeed
+                  </p>
+                </div>
+              </div>
+            </div>
+            
             <p className="modern-title">Login</p>
             <p className="modern-message">Welcome back! Please sign in to your account.</p>
             

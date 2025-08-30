@@ -9,6 +9,7 @@ import Signup from './pages/Signup';
 import Login from './pages/Login';
 import CompanyList from './pages/CompanyList';
 import ChatRoom from './pages/ChatRoom';
+import GroupManagement from './pages/GroupManagement';
 import './App.css';
 import './styles/modern-form.css';
 
@@ -75,6 +76,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/companies" element={<CompanyList />} />
           <Route path="/chat/:companyId" element={<ChatRoom />} />
+          <Route path="/groups" element={<GroupManagement />} />
+          <Route path="/chat/group/:groupId" element={<ChatRoom />} />
         </Routes>
         <ToastContainer
           position="top-right"
