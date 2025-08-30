@@ -5,6 +5,7 @@ import { setMessages, addMessage, editMessage, deleteMessage, clearMessages } fr
 import { setCompanies } from '../features/company/companySlice';
 import { io } from 'socket.io-client';
 import UserProfile from '../components/UserProfile';
+import ApiService from '../utils/apiService';
 
 const ChatRoom = () => {
   const { companyId } = useParams();
