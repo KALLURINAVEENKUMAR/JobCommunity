@@ -5,7 +5,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Railway deployment - v2
+// Railway deployment - v3 - Force restart
 
 // Import routes
 const authRoutes = require('./routes/auth');
