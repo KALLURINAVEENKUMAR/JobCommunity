@@ -544,12 +544,9 @@ const ChatRoom = () => {
       if (mentions.length > 0) {
         console.log('👥 Message contains mentions:', mentions);
       }
-      console.log('✅ API success, emitting via socket');
-      // Only emit via socket - don't add to local state
-      // Socket.IO will broadcast the message back to all clients including sender
-      if (socketRef.current) {
-        socketRef.current.emit('send-message', messageData);
-      }
+      console.log('✅ API success - socket will broadcast automatically from backend');
+      // DO NOT emit via socket here - the backend will handle broadcasting
+      // This prevents duplicate messages
     } catch (error) {
       console.error('❌ API error, using fallback for frontend-only company:', error);
       // Fallback for when backend is not available

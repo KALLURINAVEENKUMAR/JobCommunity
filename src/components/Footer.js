@@ -14,7 +14,11 @@ const Footer = () => {
               href="https://www.linkedin.com/in/naveenkumar-kalluri-3b7709224/"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-semibold transition-colors duration-200 group"
+              onClick={(e) => {
+                e.preventDefault();
+                window.open('https://www.linkedin.com/in/naveenkumar-kalluri-3b7709224/', '_blank', 'noopener,noreferrer');
+              }}
+              className="inline-flex items-center space-x-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-semibold transition-colors duration-200 group cursor-pointer"
             >
               <span>Naveenkumar Kalluri</span>
               <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="currentColor" viewBox="0 0 24 24">

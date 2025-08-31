@@ -22,8 +22,8 @@ function App() {
     const keepLoggedIn = localStorage.getItem('keepLoggedIn') === 'true';
     const userData = localStorage.getItem('userData');
     
-    // If user is not authenticated but has userData and keepLoggedIn was checked, restore the session
-    if (!isAuthenticated && userData && keepLoggedIn) {
+    // If user is not authenticated but has userData, restore the session
+    if (!isAuthenticated && userData) {
       try {
         const parsedUser = JSON.parse(userData);
         const tokenCreationTime = parsedUser.token ? 
@@ -35,6 +35,7 @@ function App() {
         if (!isTokenExpired) {
           // Restore the user session
           dispatch(initializeAuth({ user: parsedUser, keepLoggedIn }));
+          console.log('Session restored from localStorage');
         } else {
           console.log('Token expired, clearing data...');
           dispatch(logout());
@@ -49,12 +50,13 @@ function App() {
     // Let them continue their current session, but don't persist it on browser restart
   }, [isAuthenticated, dispatch]);
 
-  // Handle browser close for non-persistent sessions
+  // Handle browser close for non-persistent sessions (modified to fix login persistence)
   useEffect(() => {
     const handleBeforeUnload = () => {
       const keepLoggedIn = localStorage.getItem('keepLoggedIn') === 'true';
-      if (isAuthenticated && !keepLoggedIn) {
-        // Clear session data for non-persistent logins
+      // Only clear data if explicitly NOT keeping logged in and user closes browser
+      // Don't clear on page refresh - this was causing the login issue
+      if (isAuthenticated && !keepLoggedIn && performance.navigation?.type === 0) {
         localStorage.removeItem('userData');
         localStorage.removeItem('keepLoggedIn');
       }
