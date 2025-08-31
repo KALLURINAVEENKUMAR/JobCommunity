@@ -1,0 +1,21 @@
+<!-- 
+To replace this with your actual Navinity logo:
+
+1. Save your logo as 'navinity-logo.png' in the public folder
+2. Update the src attribute in CompanyList.js to use: "/navinity-logo.png"
+3. Make sure your image is optimized (preferably PNG with transparent background)
+4. Recommended size: 40x40px for best display
+
+For now, showing a red "N" as placeholder.
+-->
+
+<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+  <rect width="40" height="40" rx="8" fill="url(#gradient)"/>
+  <text x="20" y="28" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="white">N</text>
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>

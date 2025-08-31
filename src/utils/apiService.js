@@ -157,6 +157,36 @@ class ApiService {
     return data;
   }
 
+  static async clearMessages(companyId) {
+    const token = this.getToken();
+    const response = await fetch(`${API_BASE_URL}/messages/${companyId}/clear`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to clear messages');
+    }
+    return response.json();
+  }
+
+  static async clearGroupMessages(groupId) {
+    const token = this.getToken();
+    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/messages/clear`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to clear group messages');
+    }
+    return response.json();
+  }
+
   // Test endpoint
   static async testConnection() {
     try {

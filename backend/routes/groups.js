@@ -30,7 +30,7 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Get user's groups
+// Get user's groups - MUST come before /:groupId
 router.get('/user', authenticateToken, async (req, res) => {
   try {
     const groups = await Group.find({
@@ -44,7 +44,147 @@ router.get('/user', authenticateToken, async (req, res) => {
   }
 });
 
-// Get group by ID
+// Get group messages - MUST come before /:groupId
+router.get('/:groupId/messages', authenticateToken, async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.groupId);
+    
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    // Check if user is a member of the group
+    if (!group.members.includes(req.user.email)) {
+      return res.status(403).json({ message: 'Access denied. You are not a member of this group.' });
+    }
+
+    const messages = await GroupMessage.find({ groupId: req.params.groupId })
+      .sort({ createdAt: 1 });
+    
+    res.json(messages);
+  } catch (error) {
+    console.error('Error fetching group messages:', error);
+    res.status(500).json({ message: 'Failed to fetch group messages' });
+  }
+});
+
+// Send message to group - MUST come before /:groupId
+router.post('/:groupId/messages', authenticateToken, async (req, res) => {
+  try {
+    const { text, replyTo } = req.body;
+    const group = await Group.findById(req.params.groupId);
+    
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    // Check if user is a member of the group
+    if (!group.members.includes(req.user.email)) {
+      return res.status(403).json({ message: 'Access denied. You are not a member of this group.' });
+    }
+
+    const message = new GroupMessage({
+      groupId: req.params.groupId,
+      userId: req.user._id,
+      userEmail: req.user.email,
+      userName: req.user.name,
+      userRole: req.user.role,
+      text,
+      replyTo,
+      createdAt: new Date()
+    });
+
+    const savedMessage = await message.save();
+    res.status(201).json(savedMessage);
+  } catch (error) {
+    console.error('Error sending group message:', error);
+    res.status(500).json({ message: 'Failed to send group message' });
+  }
+});
+
+// Clear group messages - MUST come before /:groupId
+router.delete('/:groupId/messages', authenticateToken, async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.groupId);
+    
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    // Check if user is a member of the group
+    if (!group.members.includes(req.user.email)) {
+      return res.status(403).json({ message: 'Access denied. You are not a member of this group.' });
+    }
+
+    await GroupMessage.deleteMany({ groupId: req.params.groupId });
+    
+    res.json({ message: 'Group messages cleared successfully' });
+  } catch (error) {
+    console.error('Error clearing group messages:', error);
+    res.status(500).json({ message: 'Failed to clear group messages' });
+  }
+});
+
+// Add members to group - MUST come before /:groupId
+router.post('/:groupId/members', authenticateToken, async (req, res) => {
+  try {
+    const { members } = req.body;
+    const group = await Group.findById(req.params.groupId);
+    
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    // Check if user is a member of the group
+    if (!group.members.includes(req.user.email)) {
+      return res.status(403).json({ message: 'Access denied. You are not a member of this group.' });
+    }
+
+    // Add new members (avoiding duplicates)
+    const newMembers = members.filter(member => !group.members.includes(member));
+    group.members.push(...newMembers);
+    
+    const updatedGroup = await group.save();
+    res.json(updatedGroup);
+  } catch (error) {
+    console.error('Error adding group members:', error);
+    res.status(500).json({ message: 'Failed to add group members' });
+  }
+});
+
+// Leave group - MUST come before /:groupId
+router.post('/:groupId/leave', authenticateToken, async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.groupId);
+    
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    // Remove user from members
+    group.members = group.members.filter(member => member !== req.user.email);
+    
+    // If creator leaves and there are other members, transfer ownership
+    if (group.creator === req.user.email && group.members.length > 0) {
+      group.creator = group.members[0];
+    }
+    
+    // If no members left, delete the group
+    if (group.members.length === 0) {
+      await Group.findByIdAndDelete(req.params.groupId);
+      await GroupMessage.deleteMany({ groupId: req.params.groupId });
+      return res.json({ message: 'Group deleted as no members remain' });
+    }
+    
+    const updatedGroup = await group.save();
+    res.json({ message: 'Left group successfully', group: updatedGroup });
+  } catch (error) {
+    console.error('Error leaving group:', error);
+    res.status(500).json({ message: 'Failed to leave group' });
+  }
+});
+
+// Get specific group - MUST come after all specific routes
 router.get('/:groupId', authenticateToken, async (req, res) => {
   try {
     const group = await Group.findById(req.params.groupId);
@@ -58,7 +198,31 @@ router.get('/:groupId', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Access denied. You are not a member of this group.' });
     }
 
-    res.json(group);
+    // Fetch full user details for all members
+    const User = require('../models/User');
+    const memberDetails = await User.find(
+      { email: { $in: group.members } },
+      { password: 0 } // Exclude password field
+    );
+
+    // Create response with populated member data
+    const groupWithMembers = {
+      ...group.toObject(),
+      members: memberDetails.map(user => ({
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        firstName: user.name.split(' ')[0],
+        lastName: user.name.split(' ').slice(1).join(' '),
+        role: user.role,
+        companyName: user.companyName,
+        college: user.college,
+        cgpa: user.cgpa,
+        skills: user.skills
+      }))
+    };
+
+    res.json(groupWithMembers);
   } catch (error) {
     console.error('Error fetching group:', error);
     res.status(500).json({ message: 'Failed to fetch group' });
@@ -87,121 +251,6 @@ router.put('/:groupId', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error updating group:', error);
     res.status(500).json({ message: 'Failed to update group' });
-  }
-});
-
-// Add members to group
-router.post('/:groupId/members', authenticateToken, async (req, res) => {
-  try {
-    const { members } = req.body;
-    const group = await Group.findById(req.params.groupId);
-    
-    if (!group) {
-      return res.status(404).json({ message: 'Group not found' });
-    }
-
-    // Check if user is a member of the group
-    if (!group.members.includes(req.user.email)) {
-      return res.status(403).json({ message: 'Access denied. You are not a member of this group.' });
-    }
-
-    // Add new members (avoiding duplicates)
-    const newMembers = members.filter(member => !group.members.includes(member));
-    group.members.push(...newMembers);
-    
-    const updatedGroup = await group.save();
-    res.json(updatedGroup);
-  } catch (error) {
-    console.error('Error adding group members:', error);
-    res.status(500).json({ message: 'Failed to add group members' });
-  }
-});
-
-// Leave group
-router.post('/:groupId/leave', authenticateToken, async (req, res) => {
-  try {
-    const group = await Group.findById(req.params.groupId);
-    
-    if (!group) {
-      return res.status(404).json({ message: 'Group not found' });
-    }
-
-    // Remove user from members
-    group.members = group.members.filter(member => member !== req.user.email);
-    
-    // If creator leaves and there are other members, transfer ownership
-    if (group.creator === req.user.email && group.members.length > 0) {
-      group.creator = group.members[0];
-    }
-    
-    // If no members left, delete the group
-    if (group.members.length === 0) {
-      await Group.findByIdAndDelete(req.params.groupId);
-      await GroupMessage.deleteMany({ groupId: req.params.groupId });
-      return res.json({ message: 'Group deleted as no members remain' });
-    }
-    
-    await group.save();
-    res.json({ message: 'Successfully left the group' });
-  } catch (error) {
-    console.error('Error leaving group:', error);
-    res.status(500).json({ message: 'Failed to leave group' });
-  }
-});
-
-// Get group messages
-router.get('/:groupId/messages', authenticateToken, async (req, res) => {
-  try {
-    const group = await Group.findById(req.params.groupId);
-    
-    if (!group) {
-      return res.status(404).json({ message: 'Group not found' });
-    }
-
-    // Check if user is a member of the group
-    if (!group.members.includes(req.user.email)) {
-      return res.status(403).json({ message: 'Access denied. You are not a member of this group.' });
-    }
-
-    const messages = await GroupMessage.find({ groupId: req.params.groupId })
-      .sort({ timestamp: 1 })
-      .limit(100); // Limit to last 100 messages
-    
-    res.json(messages);
-  } catch (error) {
-    console.error('Error fetching group messages:', error);
-    res.status(500).json({ message: 'Failed to fetch group messages' });
-  }
-});
-
-// Send message to group
-router.post('/:groupId/messages', authenticateToken, async (req, res) => {
-  try {
-    const group = await Group.findById(req.params.groupId);
-    
-    if (!group) {
-      return res.status(404).json({ message: 'Group not found' });
-    }
-
-    // Check if user is a member of the group
-    if (!group.members.includes(req.user.email)) {
-      return res.status(403).json({ message: 'Access denied. You are not a member of this group.' });
-    }
-
-    const message = new GroupMessage({
-      ...req.body,
-      groupId: req.params.groupId,
-      userId: req.user.email,
-      userName: req.user.name || req.user.email,
-      userEmail: req.user.email,
-      timestamp: Date.now()
-    });
-
-    const savedMessage = await message.save();
-    res.status(201).json(savedMessage);
-  } catch (error) {
-    console.error('Error sending group message:', error);
-    res.status(500).json({ message: 'Failed to send group message' });
   }
 });
 

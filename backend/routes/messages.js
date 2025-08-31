@@ -188,4 +188,31 @@ router.post('/clear/:companyId', async (req, res) => {
   }
 });
 
+// Clear all messages for a company (actually delete from database)
+router.delete('/:companyId/clear', async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    
+    // Handle both numeric IDs and MongoDB ObjectIds
+    let queryFilter;
+    if (mongoose.Types.ObjectId.isValid(companyId)) {
+      queryFilter = { companyId: companyId };
+    } else {
+      queryFilter = { companyId: parseInt(companyId) };
+    }
+    
+    // Actually delete all messages for this company
+    const result = await Message.deleteMany(queryFilter);
+    
+    console.log(`🗑️ Cleared ${result.deletedCount} messages for company ${companyId}`);
+    res.json({ 
+      message: 'Messages cleared successfully', 
+      deletedCount: result.deletedCount 
+    });
+  } catch (error) {
+    console.error('Error clearing messages:', error);
+    res.status(500).json({ message: 'Server error clearing messages' });
+  }
+});
+
 module.exports = router;
