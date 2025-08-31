@@ -124,7 +124,7 @@ const Login = () => {
                     Navinity
                   </h1>
                   <p className="text-xs text-gray-500 dark:text-gray-400 font-medium tracking-wide">
-                    Connect • Grow • Succeed
+                    Merge • Gharrow • Navigate
                   </p>
                 </div>
               </div>

@@ -183,14 +183,14 @@ const CompanyList = () => {
                         Navinity
                       </h1>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                        Merge. Motivate. Manifest
+                        Merge • Gharrow • Navigate
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="min-w-0 sm:hidden">
                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
-                    Merge. Motivate. Manifest
+                    Merge • Gharrow • Navigate
                   </p>
                 </div>
               </div>
