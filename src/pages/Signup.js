@@ -4,6 +4,7 @@ import { login } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import ApiService from '../utils/apiService';
+import Footer from '../components/Footer';
 import '../styles/modern-form.css';
 import { Building2, Sparkles } from 'lucide-react';
 
@@ -218,11 +219,12 @@ const Signup = () => {
   };
 
   return (
-    <div className="auth-container">
-      <ThemeToggle />
-      
-      <div className="auth-form-wrapper">
-        <div className="modern-form">
+    <div className="flex flex-col min-h-screen">
+      <div className="auth-container flex-1">
+        <ThemeToggle />
+        
+        <div className="auth-form-wrapper">
+          <div className="modern-form">
           <form onSubmit={handleSubmit}>
             {/* Stylish Navinity Logo */}
             <div className="flex justify-center items-center mb-6">
@@ -527,6 +529,8 @@ const Signup = () => {
           </form>
         </div>
       </div>
+      </div>
+      <Footer />
     </div>
   );
 };

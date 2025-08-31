@@ -5,6 +5,7 @@ import { logout } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import UserProfile from '../components/UserProfile';
+import Footer from '../components/Footer';
 import ApiService from '../utils/apiService';
 import { Building2 } from 'lucide-react';
 
@@ -152,7 +153,7 @@ const CompanyList = () => {
 
   return (
     <div 
-      className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-300 relative overflow-hidden"
+      className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-300 relative overflow-hidden flex flex-col"
       style={{ 
         overscrollBehavior: 'none',
         touchAction: 'pan-x pan-y'
@@ -490,6 +491,9 @@ const CompanyList = () => {
         isOpen={showProfile} 
         onClose={() => setShowProfile(false)} 
       />
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

@@ -30,12 +30,14 @@ const ChatRoom = () => {
   const [showOtherUserProfile, setShowOtherUserProfile] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [currentGroup, setCurrentGroup] = useState(null);
-  const [showGroupMembers, setShowGroupMembers] = useState(false);
-  const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
+  
+  // Add Members states
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [selectedUsersToAdd, setSelectedUsersToAdd] = useState([]);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showViewMembers, setShowViewMembers] = useState(false);
+  const [showLeaveGroup, setShowLeaveGroup] = useState(false);
   
   // User tagging states
   const [showUserSuggestions, setShowUserSuggestions] = useState(false);
@@ -66,11 +68,11 @@ const ChatRoom = () => {
     try {
       const localStorageKey = isGroupChat ? `messages_group_${groupId}` : `messages_${companyId}`;
       localStorage.setItem(localStorageKey, JSON.stringify(messages));
-      console.log(`💾 Saved ${messages.length} messages to localStorage for ${isGroupChat ? 'group' : 'company'} ${chatId}`);
+      console.log(`💾 Saved ${messages.length} messages to localStorage for ${isGroupChat ? 'group' : 'company'} ${isGroupChat ? groupId : companyId}`);
     } catch (error) {
       console.error('Failed to save messages to localStorage:', error);
     }
-  }, [isGroupChat, groupId, companyId, chatId]);
+  }, [isGroupChat, groupId, companyId]);
 
   // Load group data if we're in a group chat
   useEffect(() => {
@@ -94,7 +96,7 @@ const ChatRoom = () => {
     if (messages.length > 0) {
       saveMessagesToLocalStorage(messages);
     }
-  }, [messages, saveMessagesToLocalStorage]);
+  }, [messages, saveMessagesToLocalStorage]); // Fixed dependency
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -391,49 +393,6 @@ const ChatRoom = () => {
       }
     });
 
-    // Listen for new group messages
-    socketRef.current.on('new-group-message', (message) => {
-      console.log('📨 Received new group message:', message);
-      
-      // Check if this message was already added locally to prevent duplicates
-      if (localMessageIds.current.has(message.id)) {
-        console.log('🔄 Skipping duplicate group message:', message.id);
-        return;
-      }
-      
-      dispatch(addMessage(message));
-      
-      // Show notification if message is from another user
-      if (message.userId !== (user?.id || user?.email)) {
-        // Check if current user is mentioned
-        const isUserMentioned = message.mentions && message.mentions.some(mention => 
-          mention.userEmail === user?.email || mention.userName.toLowerCase() === user?.name?.toLowerCase()
-        );
-        
-        if (isUserMentioned) {
-          // Special notification for mentions
-          toast.success(`🏷️ ${message.userName} mentioned you in group chat!`, {
-            position: "top-right",
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          });
-        } else {
-          // Regular message notification
-          toast.info(`💬 ${message.userName}: ${message.text.length > 50 ? message.text.substring(0, 50) + '...' : message.text}`, {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          });
-        }
-      }
-    });
-
     // Listen for special interview help notifications
     socketRef.current.on('interview-help-notification', (data) => {
       showInterviewHelpNotification(data.message, data.companyName, data.studentName);
@@ -589,11 +548,7 @@ const ChatRoom = () => {
       // Only emit via socket - don't add to local state
       // Socket.IO will broadcast the message back to all clients including sender
       if (socketRef.current) {
-        if (isGroupChat) {
-          socketRef.current.emit('send-group-message', messageData);
-        } else {
-          socketRef.current.emit('send-message', messageData);
-        }
+        socketRef.current.emit('send-message', messageData);
       }
     } catch (error) {
       console.error('❌ API error, using fallback for frontend-only company:', error);
@@ -603,11 +558,7 @@ const ChatRoom = () => {
       
       dispatch(addMessage(messageData));
       if (socketRef.current) {
-        if (isGroupChat) {
-          socketRef.current.emit('send-group-message', messageData);
-        } else {
-          socketRef.current.emit('send-message', messageData);
-        }
+        socketRef.current.emit('send-message', messageData);
       }
     }
     
@@ -678,30 +629,18 @@ const ChatRoom = () => {
     setShowClearPopup(true);
   };
 
-  const confirmClearChat = async () => {
-    try {
-      // Clear messages from server
-      if (isGroupChat) {
-        await ApiService.clearGroupMessages(groupId);
-      } else {
-        await ApiService.clearMessages(companyId);
-      }
-
-      // Clear from Redux store
-      dispatch(clearMessages());
-      
-      // Clear from localStorage
-      const localStorageKey = isGroupChat ? `messages_group_${groupId}` : `messages_${companyId}`;
-      localStorage.removeItem(localStorageKey);
-      
-      setShowClearPopup(false);
-      
-      // Show success message
-      toast.success('Chat cleared successfully!');
-    } catch (error) {
-      console.error('Failed to clear chat:', error);
-      toast.error('Failed to clear chat. Please try again.');
-    }
+  const confirmClearChat = () => {
+    // Clear from Redux store
+    dispatch(clearMessages());
+    
+    // Clear from localStorage
+    const localStorageKey = isGroupChat ? `messages_group_${groupId}` : `messages_${companyId}`;
+    localStorage.removeItem(localStorageKey);
+    
+    setShowClearPopup(false);
+    
+    // Show success message
+    toast.success('Chat cleared successfully!');
   };
 
   const cancelClearChat = () => {
@@ -786,96 +725,6 @@ const ChatRoom = () => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  // Group management functions
-  const handleLeaveGroup = async () => {
-    if (!isGroupChat || !groupId) return;
-    
-    try {
-      await ApiService.leaveGroup(groupId);
-      toast.success('Left group successfully');
-      navigate('/groups');
-    } catch (error) {
-      console.error('Failed to leave group:', error);
-      toast.error('Failed to leave group. Please try again.');
-    } finally {
-      setShowLeaveGroupConfirm(false);
-    }
-  };
-
-  const confirmLeaveGroup = () => {
-    setShowLeaveGroupConfirm(true);
-  };
-
-  const cancelLeaveGroup = () => {
-    setShowLeaveGroupConfirm(false);
-  };
-
-  // Add Members functionality
-  const openAddMembers = async () => {
-    try {
-      // Load all available users
-      const token = localStorage.getItem('token');
-      const users = await ApiService.getAllUsers(token);
-      
-      // Filter out users who are already members
-      const currentMemberIds = currentGroup?.members?.map(member => member.id || member.email) || [];
-      const available = users.filter(user => !currentMemberIds.includes(user.id) && !currentMemberIds.includes(user.email));
-      
-      setAvailableUsers(available);
-      setShowAddMembers(true);
-    } catch (error) {
-      console.error('Failed to load users:', error);
-      toast.error('Failed to load available users');
-    }
-  };
-
-  const handleAddMembers = async () => {
-    if (!selectedUsersToAdd.length) {
-      toast.warning('Please select at least one user to add');
-      return;
-    }
-
-    try {
-      // Add the selected members using their emails or IDs
-      const memberIdentifiers = selectedUsersToAdd.map(user => user.email);
-      await ApiService.addGroupMembers(groupId, memberIdentifiers);
-      
-      // Reload group data to get updated members list
-      const updatedGroup = await ApiService.getGroup(groupId);
-      setCurrentGroup(updatedGroup);
-      
-      toast.success(`Successfully added ${selectedUsersToAdd.length} member${selectedUsersToAdd.length > 1 ? 's' : ''} to the group`);
-      setShowAddMembers(false);
-      setSelectedUsersToAdd([]);
-      setSearchTerm('');
-    } catch (error) {
-      console.error('Failed to add members:', error);
-      toast.error('Failed to add members. Please try again.');
-    }
-  };
-
-  const toggleUserSelection = (user) => {
-    setSelectedUsersToAdd(prev => {
-      const isSelected = prev.some(selected => selected.id === user.id);
-      if (isSelected) {
-        return prev.filter(selected => selected.id !== user.id);
-      } else {
-        return [...prev, user];
-      }
-    });
-  };
-
-  const cancelAddMembers = () => {
-    setShowAddMembers(false);
-    setSelectedUsersToAdd([]);
-    setSearchTerm('');
-  };
-
-  // Check if current user is the group admin/creator
-  const isGroupAdmin = () => {
-    return currentGroup && user && (currentGroup.creator === user.id || currentGroup.creator === user.email);
   };
 
   const formatTime = (timestamp) => {
@@ -998,10 +847,93 @@ const ChatRoom = () => {
     return message.userId === user?.id || message.userId === user?.email;
   };
 
+  // Add Members functions
+  const openAddMembers = async () => {
+    try {
+      const token = ApiService.getToken();
+      const allUsers = await ApiService.getAllUsers(token);
+      // Filter out current members
+      const currentMembers = currentGroup?.members || [];
+      const available = allUsers.filter(u => 
+        !currentMembers.includes(u.id) && !currentMembers.includes(u.email)
+      );
+      setAvailableUsers(available);
+      setShowAddMembers(true);
+      setSearchTerm('');
+      setSelectedUsersToAdd([]);
+    } catch (error) {
+      toast.error('Failed to load users');
+      console.error('Error loading users:', error);
+    }
+  };
+
+  const handleAddMembers = async () => {
+    if (selectedUsersToAdd.length === 0) {
+      toast.error('Please select at least one user to add');
+      return;
+    }
+
+    try {
+      const memberIds = selectedUsersToAdd.map(u => u.id || u.email);
+      await ApiService.addGroupMembers(groupId, memberIds);
+      
+      // Refresh group data
+      const updatedGroup = await ApiService.getGroup(groupId);
+      setCurrentGroup(updatedGroup);
+      
+      toast.success(`Successfully added ${selectedUsersToAdd.length} member(s)`);
+      setShowAddMembers(false);
+      setSelectedUsersToAdd([]);
+    } catch (error) {
+      toast.error('Failed to add members');
+      console.error('Error adding members:', error);
+    }
+  };
+
+  const toggleUserSelection = (user) => {
+    setSelectedUsersToAdd(prev => {
+      const isSelected = prev.some(u => (u.id || u.email) === (user.id || user.email));
+      if (isSelected) {
+        return prev.filter(u => (u.id || u.email) !== (user.id || user.email));
+      } else {
+        return [...prev, user];
+      }
+    });
+  };
+
+  const cancelAddMembers = () => {
+    setShowAddMembers(false);
+    setSearchTerm('');
+    setSelectedUsersToAdd([]);
+  };
+
+  const isGroupAdmin = () => {
+    return currentGroup?.creator === (user?.id || user?.email);
+  };
+
+  const handleLeaveGroup = async () => {
+    try {
+      await ApiService.leaveGroup(groupId);
+      toast.success('Successfully left the group');
+      navigate('/groups');
+    } catch (error) {
+      toast.error('Failed to leave group');
+      console.error('Error leaving group:', error);
+    }
+  };
+
+  const openViewMembers = () => {
+    setShowViewMembers(true);
+  };
+
+  const closeViewMembers = () => {
+    setShowViewMembers(false);
+  };
+
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-gray-700/50 flex-shrink-0">
+    <div className="h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col overflow-hidden relative">
+      {/* Header - Fixed */}
+      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-gray-700/50 flex-shrink-0 sticky top-0 z-10">
         <div className="w-full px-3 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3 sm:py-6">
             <div className="flex items-center min-w-0 flex-1">
@@ -1014,12 +946,22 @@ const ChatRoom = () => {
                 </svg>
               </button>
               <div className="min-w-0 flex-1">
-                <h1 className="text-base sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent truncate">
-                  {isGroupChat 
-                    ? (currentGroup ? `${currentGroup.name} Group` : 'Private Group') 
-                    : `${currentCompany.name} Discussion Room`
-                  }
-                </h1>
+                <div className="flex items-center">
+                  <img 
+                    src="/navinity-logo.svg" 
+                    alt="Navinity" 
+                    className="w-6 h-6 sm:w-8 sm:h-8 mr-2 flex-shrink-0"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                  <h1 className="text-base sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent truncate">
+                    {isGroupChat 
+                      ? (currentGroup ? `${currentGroup.name}` : 'Private Group') 
+                      : `${currentCompany?.name || 'Navinity'}`
+                    }
+                  </h1>
+                </div>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-1 truncate">
                   {isGroupChat
                     ? (currentGroup ? `Private group • ${currentGroup.members?.length || 0} members` : 'Loading group...')
@@ -1054,10 +996,46 @@ const ChatRoom = () => {
                 </div>
               </div>
             </div>
-            <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 ml-2">
+            <div className="flex items-center space-x-1 sm:space-x-3 ml-2">
+              {isGroupChat && isGroupAdmin() && (
+                <button
+                  onClick={openAddMembers}
+                  className="flex items-center space-x-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs sm:text-sm p-2 sm:p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 group"
+                  title="Add Members"
+                >
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                  <span className="hidden sm:inline">Add</span>
+                </button>
+              )}
+              {isGroupChat && (
+                <button
+                  onClick={openViewMembers}
+                  className="flex items-center space-x-1 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-xs sm:text-sm p-2 sm:p-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-all duration-200 group"
+                  title="View Members"
+                >
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                  </svg>
+                  <span className="hidden sm:inline">Members</span>
+                </button>
+              )}
+              {isGroupChat && (
+                <button
+                  onClick={() => setShowLeaveGroup(true)}
+                  className="flex items-center space-x-1 text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 text-xs sm:text-sm p-2 sm:p-3 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all duration-200 group"
+                  title="Leave Group"
+                >
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                  </svg>
+                  <span className="hidden sm:inline">Leave</span>
+                </button>
+              )}
               <button
                 onClick={clearChatHandler}
-                className="flex items-center space-x-1 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-xs sm:text-sm p-1.5 sm:p-2 md:p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 group"
+                className="flex items-center space-x-1 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-xs sm:text-sm p-2 sm:p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 group"
                 title="Clear Chat"
               >
                 <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1065,51 +1043,9 @@ const ChatRoom = () => {
                 </svg>
                 <span className="hidden sm:inline">Clear</span>
               </button>
-              
-              {/* Group Management Buttons - Only show for group chats */}
-              {isGroupChat && (
-                <>
-                  {/* Add Members button - Only show for group admin */}
-                  {isGroupAdmin() && (
-                    <button
-                      onClick={openAddMembers}
-                      className="flex items-center space-x-1 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-xs sm:text-sm p-1.5 sm:p-2 md:p-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-all duration-200 group"
-                      title="Add Members"
-                    >
-                      <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
-                      </svg>
-                      <span className="hidden md:inline">Add</span>
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={() => setShowGroupMembers(true)}
-                    className="flex items-center space-x-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs sm:text-sm p-1.5 sm:p-2 md:p-3 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 group"
-                    title="View Group Members"
-                  >
-                    <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                    </svg>
-                    <span className="hidden md:inline">Members</span>
-                  </button>
-                  
-                  <button
-                    onClick={confirmLeaveGroup}
-                    className="flex items-center space-x-1 text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 text-xs sm:text-sm p-1.5 sm:p-2 md:p-3 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all duration-200 group"
-                    title="Leave Group"
-                  >
-                    <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                    </svg>
-                    <span className="hidden md:inline">Leave</span>
-                  </button>
-                </>
-              )}
-              
               <button
                 onClick={requestNotificationPermission}
-                className="flex items-center space-x-1 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-xs sm:text-sm p-1.5 sm:p-2 md:p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 group"
+                className="flex items-center space-x-1 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-xs sm:text-sm p-2 sm:p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 group"
                 title="Enable Notifications"
               >
                 <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1117,18 +1053,18 @@ const ChatRoom = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-5 5-5-5h5zM15 17h5l-5 5-5-5h5z"/>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12a3 3 0 016 0c0 1.657-.895 3-2 3s-2-1.343-2-3z"/>
                 </svg>
-                <span className="hidden md:inline">Notify</span>
+                <span className="hidden sm:inline">Notify</span>
               </button>
-              <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 pl-2 sm:pl-3 border-l border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-2 sm:space-x-3 pl-2 sm:pl-3 border-l border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => setShowUserProfile(true)}
-                  className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 p-1 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 group"
+                  className="flex items-center space-x-2 sm:space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 group"
                   title="View Profile"
                 >
-                  <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs sm:text-sm flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs sm:text-sm flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
                     {(user?.firstName || user?.name || user?.email)?.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 hidden lg:inline truncate max-w-20 xl:max-w-32 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 hidden md:inline truncate max-w-32 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {getDisplayName(user)}
                   </span>
                 </button>
@@ -1139,12 +1075,12 @@ const ChatRoom = () => {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 min-h-0">
+      <div className="flex-1 overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 min-h-0 relative">
         <div className="h-full w-full px-2 sm:px-4 lg:px-8">
           <div className="h-full flex flex-col">
             {/* Messages List */}
             <div className="flex-1 overflow-y-auto py-3 sm:py-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scroll-smooth"
-                 style={{ maxHeight: 'calc(100vh - 200px)' }}>
+                 style={{ height: 'calc(100vh - 160px)' }}>
               <div className="min-h-full space-y-2 sm:space-y-3">
               {messages.map((message) => {
                 const isInterviewHelp = message.userRole === 'student' && 
@@ -1304,7 +1240,7 @@ const ChatRoom = () => {
             </div>
 
             {/* Message Input Area */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-t border-gray-200/50 dark:border-gray-700/50 p-3 sm:p-6 shadow-lg flex-shrink-0">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-t border-gray-200/50 dark:border-gray-700/50 p-3 sm:p-6 shadow-lg flex-shrink-0 sticky bottom-0 z-10">
               
               {/* Reply Preview */}
               {replyingTo && (
@@ -1522,6 +1458,229 @@ const ChatRoom = () => {
         </div>
       )}
 
+      {/* Add Members Modal */}
+      {showAddMembers && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-md mx-auto">
+            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl shadow-2xl rounded-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 p-6 relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/90 via-blue-600/90 to-indigo-600/90"></div>
+                <div className="relative flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border-2 border-white/30">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-white text-center mt-4">Add Members</h3>
+              </div>
+              
+              {/* Content */}
+              <div className="p-6">
+                <p className="text-gray-700 dark:text-gray-300 text-center text-sm mb-4">
+                  Select users to add to the group
+                </p>
+                
+                {/* Search Input */}
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                {/* Users List */}
+                <div className="max-h-60 overflow-y-auto mb-4">
+                  {availableUsers
+                    .filter(u => 
+                      (u.firstName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                      (u.lastName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                      (u.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                      (u.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                    )
+                    .map((user) => (
+                      <div
+                        key={user.id || user.email}
+                        onClick={() => toggleUserSelection(user)}
+                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 mb-2 ${
+                          selectedUsersToAdd.some(u => (u.id || u.email) === (user.id || user.email))
+                            ? 'bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-500'
+                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-medium text-sm">
+                            {(user.firstName || user.name || user.email)?.charAt(0).toUpperCase() || 'U'}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-gray-100">
+                              {user.firstName && user.lastName 
+                                ? `${user.firstName} ${user.lastName}` 
+                                : user.name || user.email
+                              }
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
+                          </div>
+                        </div>
+                        {selectedUsersToAdd.some(u => (u.id || u.email) === (user.id || user.email)) && (
+                          <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                    ))
+                  }
+                  
+                  {availableUsers.filter(u => 
+                    (u.firstName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                    (u.lastName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                    (u.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                    (u.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                  ).length === 0 && (
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                      {searchTerm ? 'No users found' : 'No available users to add'}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Selected Count */}
+                {selectedUsersToAdd.length > 0 && (
+                  <p className="text-sm text-blue-600 dark:text-blue-400 text-center mb-4">
+                    {selectedUsersToAdd.length} user(s) selected
+                  </p>
+                )}
+                
+                {/* Action Buttons */}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleAddMembers}
+                    disabled={selectedUsersToAdd.length === 0}
+                    className="flex-1 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 hover:from-blue-600 hover:via-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:via-gray-500 disabled:to-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100 shadow-lg hover:shadow-xl disabled:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:cursor-not-allowed"
+                  >
+                    ➕ Add Members
+                  </button>
+                  <button
+                    onClick={cancelAddMembers}
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                  >
+                    ✕ Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Members Modal */}
+      {showViewMembers && currentGroup && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-md mx-auto">
+            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl shadow-2xl rounded-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-green-500 via-green-600 to-emerald-600 p-6 relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/90 via-green-600/90 to-emerald-600/90"></div>
+                <div className="relative flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border-2 border-white/30">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-white text-center mt-4">Group Members</h3>
+              </div>
+              
+              {/* Content */}
+              <div className="p-6">
+                <p className="text-gray-700 dark:text-gray-300 text-center mb-4">
+                  {currentGroup.members?.length || 0} members in this group
+                </p>
+                
+                <div className="max-h-60 overflow-y-auto mb-4">
+                  {currentGroup.members?.map((memberId, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700 mb-2">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold">
+                          {memberId.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">{memberId}</div>
+                          {memberId === currentGroup.creator && (
+                            <div className="text-xs text-blue-600 dark:text-blue-400">Admin</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Footer */}
+              <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-center">
+                <button
+                  onClick={closeViewMembers}
+                  className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Group Confirmation Modal */}
+      {showLeaveGroup && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-md mx-auto">
+            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl shadow-2xl rounded-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 p-6 relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-500/90 via-orange-600/90 to-red-600/90"></div>
+                <div className="relative flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border-2 border-white/30">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-white text-center mt-4">Leave Group</h3>
+              </div>
+              
+              {/* Content */}
+              <div className="p-6">
+                <p className="text-gray-700 dark:text-gray-300 text-center text-lg mb-2">
+                  Are you sure you want to leave this group?
+                </p>
+                <p className="text-gray-500 dark:text-gray-400 text-center text-sm">
+                  You won't be able to see messages or rejoin unless added by an admin.
+                </p>
+              </div>
+              
+              {/* Footer */}
+              <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-center space-x-4">
+                <button
+                  onClick={() => setShowLeaveGroup(false)}
+                  className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLeaveGroup}
+                  className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors duration-200"
+                >
+                  Leave Group
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Enable Notifications Popup */}
       {showNotificationPopup && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
@@ -1673,315 +1832,6 @@ const ChatRoom = () => {
                 >
                   ✕ Close
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Group Members Modal */}
-      {showGroupMembers && currentGroup && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-lg mx-auto">
-            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl shadow-2xl rounded-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 p-6 relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/90 via-blue-600/90 to-indigo-600/90"></div>
-                <div className="relative flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border-2 border-white/30">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-white">Group Members</h3>
-                      <p className="text-white/80 text-sm">{currentGroup.name}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowGroupMembers(false)}
-                    className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-all duration-200 hover:scale-110"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              
-              {/* Content */}
-              <div className="p-6">
-                <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {currentGroup.members?.map((member, index) => (
-                    <div key={member.id || index} className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
-                        {(member.firstName || member.name || member.email)?.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                          {member.firstName && member.lastName 
-                            ? `${member.firstName} ${member.lastName}` 
-                            : member.name || member.email}
-                          {member.id === user?.id && (
-                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400 font-medium">(You)</span>
-                          )}
-                        </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{member.email}</p>
-                        {member.role && (
-                          <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
-                            member.role === 'professional' 
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
-                              : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          }`}>
-                            {member.role}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center">
-                        <div className={`w-2 h-2 rounded-full ${
-                          onlineUsers.some(onlineUser => onlineUser.id === member.id)
-                            ? 'bg-green-500' 
-                            : 'bg-gray-400'
-                        }`}></div>
-                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                          {onlineUsers.some(onlineUser => onlineUser.id === member.id) ? 'Online' : 'Offline'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {(!currentGroup.members || currentGroup.members.length === 0) && (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                    </svg>
-                    <p>No members found</p>
-                  </div>
-                )}
-              </div>
-              
-              {/* Footer */}
-              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  onClick={() => setShowGroupMembers(false)}
-                  className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                >
-                  ✕ Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Leave Group Confirmation Modal */}
-      {showLeaveGroupConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-md mx-auto">
-            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl shadow-2xl rounded-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 p-6 relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-orange-500/90 via-orange-600/90 to-red-600/90"></div>
-                <div className="relative flex items-center justify-center">
-                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border-2 border-white/30">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="text-xl font-bold text-white text-center mt-4">Leave Group</h3>
-              </div>
-              
-              {/* Content */}
-              <div className="p-6">
-                <p className="text-gray-700 dark:text-gray-300 text-center text-lg mb-2">
-                  Are you sure you want to leave this group?
-                </p>
-                <p className="text-gray-500 dark:text-gray-400 text-center text-sm">
-                  You'll no longer receive messages from this group and won't be able to send messages to it.
-                </p>
-                {currentGroup && (
-                  <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 text-center">
-                      "{currentGroup.name}"
-                    </p>
-                  </div>
-                )}
-              </div>
-              
-              {/* Footer */}
-              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex space-x-3">
-                  <button
-                    onClick={handleLeaveGroup}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                  >
-                    🚪 Leave Group
-                  </button>
-                  <button
-                    onClick={cancelLeaveGroup}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                  >
-                    ✕ Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Members Modal */}
-      {showAddMembers && currentGroup && isGroupAdmin() && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-lg mx-auto">
-            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl shadow-2xl rounded-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-green-500 via-green-600 to-emerald-600 p-4 sm:p-6 relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-green-500/90 via-green-600/90 to-emerald-600/90"></div>
-                <div className="relative flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border-2 border-white/30">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white">Add Members</h3>
-                      <p className="text-white/80 text-sm">{currentGroup.name}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={cancelAddMembers}
-                    className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-all duration-200 hover:scale-110"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              
-              {/* Content */}
-              <div className="p-4 sm:p-6">
-                {/* Search bar */}
-                <div className="mb-4">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search users by name or email..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full px-4 py-3 pl-10 pr-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-                    />
-                    <svg className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Selected users count */}
-                {selectedUsersToAdd.length > 0 && (
-                  <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                    <p className="text-sm text-green-800 dark:text-green-200 font-medium">
-                      {selectedUsersToAdd.length} user{selectedUsersToAdd.length > 1 ? 's' : ''} selected
-                    </p>
-                  </div>
-                )}
-                
-                {/* Available users list */}
-                <div className="space-y-2 max-h-60 sm:max-h-80 overflow-y-auto">
-                  {availableUsers
-                    .filter(user => 
-                      searchTerm === '' || 
-                      (user.firstName && user.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                      (user.lastName && user.lastName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                    .map((user) => {
-                      const isSelected = selectedUsersToAdd.some(selected => selected.id === user.id);
-                      return (
-                        <div
-                          key={user.id}
-                          onClick={() => toggleUserSelection(user)}
-                          className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-all duration-200 ${
-                            isSelected
-                              ? 'bg-green-100 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-600'
-                              : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent'
-                          }`}
-                        >
-                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-medium text-sm flex-shrink-0 ${
-                            isSelected ? 'bg-green-500' : 'bg-gradient-to-r from-blue-500 to-purple-600'
-                          }`}>
-                            {isSelected ? (
-                              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                              </svg>
-                            ) : (
-                              (user.firstName || user.name || user.email)?.charAt(0).toUpperCase()
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm sm:text-base">
-                              {user.firstName && user.lastName 
-                                ? `${user.firstName} ${user.lastName}` 
-                                : user.name || user.email}
-                            </p>
-                            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
-                            {user.role && (
-                              <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
-                                user.role === 'professional' 
-                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
-                                  : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              }`}>
-                                {user.role}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    
-                  {availableUsers.filter(user => 
-                    searchTerm === '' || 
-                    (user.firstName && user.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                    (user.lastName && user.lastName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                    (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-                  ).length === 0 && (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                      </svg>
-                      <p>{searchTerm ? 'No users found matching your search' : 'No users available to add'}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Footer */}
-              <div className="px-4 py-4 sm:px-6 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex space-x-3">
-                  <button
-                    onClick={handleAddMembers}
-                    disabled={selectedUsersToAdd.length === 0}
-                    className={`flex-1 font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-                      selectedUsersToAdd.length > 0
-                        ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white focus:ring-green-500'
-                        : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    ✅ Add {selectedUsersToAdd.length > 0 ? `${selectedUsersToAdd.length} ` : ''}Member{selectedUsersToAdd.length !== 1 ? 's' : ''}
-                  </button>
-                  <button
-                    onClick={cancelAddMembers}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                  >
-                    ✕ Cancel
-                  </button>
-                </div>
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { login, loginStart, loginFailure } from '../features/auth/userSlice';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+import Footer from '../components/Footer';
 import ApiService from '../utils/apiService';
 import '../styles/modern-form.css';
 import { Building2, Sparkles } from 'lucide-react';
@@ -106,10 +107,10 @@ const Login = () => {
   };
 
   return (
-    <div className="auth-container">
+    <div className="auth-container flex flex-col min-h-screen">
       <ThemeToggle />
       
-      <div className="auth-form-wrapper">
+      <div className="auth-form-wrapper flex-grow flex items-center justify-center">
         <div className="modern-form">
           <form onSubmit={handleSubmit}>
             {/* Stylish Navinity Logo */}
@@ -242,6 +243,9 @@ const Login = () => {
           </form>
         </div>
       </div>
+      
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

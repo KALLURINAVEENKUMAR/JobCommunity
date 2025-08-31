@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import ApiService from '../utils/apiService';
 import { toast } from 'react-toastify';
 import UserAvatar from '../components/UserAvatar';
+import Footer from '../components/Footer';
 
 const GroupManagement = () => {
   const navigate = useNavigate();
@@ -127,7 +128,8 @@ const GroupManagement = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="flex flex-col min-h-screen">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex-1">
       {/* Header */}
       <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg shadow-lg border-b border-gray-200/50 dark:border-gray-700/50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -359,6 +361,8 @@ const GroupManagement = () => {
           </div>
         </div>
       )}
+      </div>
+      <Footer />
     </div>
   );
 };
