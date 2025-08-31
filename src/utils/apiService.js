@@ -137,26 +137,6 @@ class ApiService {
     return data;
   }
 
-  static async sendGroupMessage(messageData) {
-    const token = this.getToken();
-    const response = await fetch(`${API_BASE_URL}/groups/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(messageData),
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to send group message');
-    }
-    
-    return data;
-  }
-
   static async clearMessages(companyId) {
     const token = this.getToken();
     const response = await fetch(`${API_BASE_URL}/messages/${companyId}/clear`, {
